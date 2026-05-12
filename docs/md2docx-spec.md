@@ -91,6 +91,8 @@ Rationale:
 | task list | normal bullet list with `[ ]` or `[x]` text preserved |
 | `![alt](path)` | embedded image |
 
+List semantics are part of the first-cut contract. Unordered lists and task lists must be emitted as real DOCX list items, not as ordinary paragraphs with literal bullet characters. Compatibility fixes should improve the OOXML numbering definition rather than degrading list structure.
+
 ## 6. HTML Policy
 
 Raw HTML in Markdown is limited-support input.
@@ -107,6 +109,8 @@ Other HTML should be converted to plain text when practical.
 The summary should record unsupported HTML through `unsupportedHtml`.
 
 The first cut should not attempt general HTML-to-DOCX conversion.
+
+The current implementation treats supported HTML as a narrow convenience layer over Markdown AST nodes. Complex HTML parsing, CSS interpretation, nested arbitrary HTML, and browser-equivalent HTML rendering are out of scope.
 
 ## 7. Tables
 
@@ -182,6 +186,8 @@ If that is too heavy for the first implementation, a plain separator paragraph i
 
 Task-list items should be treated as normal bullet list items in the first cut.
 
+They must remain DOCX list items. Do not convert task-list or unordered-list items into plain paragraphs with literal bullet characters as a compatibility workaround.
+
 The checkbox text is preserved literally:
 
 - `[ ]`
@@ -215,6 +221,8 @@ Markdown image paths are resolved relative to the input `.md` file.
 Remote URL image download is out of scope for the first cut.
 
 SVG support is out of scope for the first cut unless a later implementation chooses a safe conversion strategy.
+
+The current implementation supports local PNG, JPEG, GIF, and WebP package naming and content type declarations. Unknown image extensions may be embedded as `application/octet-stream` when bytes are supplied by the caller, but visual compatibility is not guaranteed.
 
 ### 14.2 Missing Images
 
@@ -292,6 +300,8 @@ word/numbering.xml
 docProps/core.xml
 docProps/app.xml
 ```
+
+`word/_rels/document.xml.rels` must include explicit relationships from the main document to `styles.xml` and `numbering.xml`. Numbering definitions are not just loose package parts; list paragraphs depend on the numbering relationship being discoverable by Word-compatible readers.
 
 When images are embedded, include:
 
@@ -392,10 +402,37 @@ Recommended fields:
 - `resizedImages`
 - `frontMatter`
 - `unsupportedHtml`
+- `missingImageDetails`
 
 The summary should make conversion gaps visible without turning normal conversion into a hard failure.
 
-## 19. Initial Implementation Priorities
+`missingImageDetails` records the source path and alt text for each missing image when available. Source line numbers are not currently recorded.
+
+## 19. Test and Verification Direction
+
+Current automated verification includes:
+
+- unit tests for DOCX ZIP package entries
+- representative OOXML golden-fragment checks for `word/document.xml`, relationships, styles, and numbering
+- image tests for missing images, embedded PNG/JPEG/GIF/WebP images, unknown extensions, remote image URLs, and resize behavior
+- raw HTML tests for supported, unsupported, uppercase tag, single-quoted attribute, and reordered attribute cases
+- CLI metadata and conversion tests
+- browser entrypoint wiring tests
+
+Local verification commands:
+
+```bash
+npm run build
+npx tsc --noEmit
+npm run test:unit
+npm run smoke:docx
+npm run build:bundle
+npm run smoke:bundle
+```
+
+Manual compatibility review in Microsoft Word and LibreOffice remains a follow-up item.
+
+## 20. Initial Implementation Priorities
 
 Recommended implementation order:
 

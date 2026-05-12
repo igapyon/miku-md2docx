@@ -11,6 +11,22 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 const bundleDir = path.resolve(rootDir, "bundle");
 const productName = "miku-md2docx";
+const sourceArchiveCandidates = [
+  ".gitignore",
+  "LICENSE",
+  "README.md",
+  "TODO.md",
+  "docs",
+  "index.html",
+  "miku-md2docx.html",
+  "package-lock.json",
+  "package.json",
+  "scripts",
+  "src",
+  "tests",
+  "tsconfig.json",
+  "vitest.config.ts"
+];
 
 async function pathExists(relPath) {
   try {
@@ -22,24 +38,8 @@ async function pathExists(relPath) {
 }
 
 async function createSourceArchive(outputPath) {
-  const candidates = [
-    ".gitignore",
-    "LICENSE",
-    "README.md",
-    "TODO.md",
-    "docs",
-    "index.html",
-    "miku-md2docx.html",
-    "package-lock.json",
-    "package.json",
-    "scripts",
-    "src",
-    "tests",
-    "tsconfig.json",
-    "vitest.config.ts"
-  ];
   const sources = [];
-  for (const relPath of candidates) {
+  for (const relPath of sourceArchiveCandidates) {
     if (await pathExists(relPath)) {
       sources.push(relPath);
     }
