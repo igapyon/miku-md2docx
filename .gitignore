@@ -1,4 +1,12 @@
 .DS_Store
 
+node_modules/
+.npm-cache/
+dist/
+bundle/
+coverage/
+*.log
+npm-debug.log*
+
 workplace/*
 !workplace/.gitkeep
