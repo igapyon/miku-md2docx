@@ -330,6 +330,22 @@ Potential future option:
 
 Default behavior is non-strict. Missing images and unresolved internal links should be reported in summary without aborting conversion.
 
+The release-oriented local bundle path is:
+
+```bash
+npm run build:bundle
+npm run smoke:bundle
+```
+
+Expected generated files:
+
+```text
+bundle/miku-md2docx.mjs
+bundle/miku-md2docx-sources.tgz
+```
+
+GitHub Release asset upload is handled by `.github/workflows/release-assets.yml` on `v*` tag pushes.
+
 ## 17. Browser UI
 
 The browser UI should follow the same local-first direction as the sibling project.
@@ -344,6 +360,13 @@ First-cut browser behavior:
 - optionally download summary
 
 No selected local file should be uploaded to a remote service by default.
+
+The current browser entrypoints are:
+
+- `index.html`
+- `miku-md2docx.html`
+
+The browser runtime bundle is generated from `src/ts/main.ts` to `src/js/main.js`.
 
 ## 18. Summary and Diagnostics
 
