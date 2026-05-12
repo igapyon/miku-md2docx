@@ -13,6 +13,21 @@
 - [x] Expand image tests for embedded images, missing images, and resized images.
 - [x] Improve limited raw HTML handling for `<ins>`, `<a>`, and `<img>`.
 - [x] Add release bundle build and smoke path when the CLI runtime shape stabilizes.
+- [x] Add representative OOXML golden tests for document, relationships, styles, and numbering parts.
+- [x] Add complex Markdown summary tests.
+- [x] Add GIF image embedding test.
+- [x] Add unsupported raw HTML fallback test.
+- [x] Add JPEG, WebP, unknown-extension, and remote-image edge case tests.
+- [x] Add raw HTML edge case tests for uppercase tags, single-quoted attributes, reordered attributes, and extra whitespace.
+- [x] Add manual DOCX compatibility smoke fixture and generator.
+- [x] Add explicit DOCX document relationships for `styles.xml` and `numbering.xml` so list numbering is loaded by Word-compatible readers.
+
+## Remaining Follow-up
+
+- [ ] Manually open generated `.docx` files in Microsoft Word and LibreOffice.
+- [ ] Keep unordered and task lists as real DOCX list semantics; do not replace them with literal bullet characters as a compatibility workaround.
+- [ ] Decide whether remote image URLs should be reported with a dedicated summary field.
+- [ ] Decide whether OOXML golden checks should stay inline or move to fixture files as coverage grows.
 
 ## Future
 

@@ -16,7 +16,7 @@ convertButton.addEventListener("click", () => {
 
 downloadButton.addEventListener("click", () => {
   if (!lastDocx) return;
-  const blob = new Blob([lastDocx], {
+  const blob = new Blob([toArrayBuffer(lastDocx)], {
     type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   });
   const url = URL.createObjectURL(blob);
@@ -71,6 +71,12 @@ function outputName(inputName: string): string {
 
 function basename(path: string): string {
   return path.split(/[\\/]/).pop() || path;
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
 }
 
 function setStatus(message: string): void {

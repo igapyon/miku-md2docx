@@ -217,6 +217,377 @@ var require_format = __commonJS({
   }
 });
 
+// src/ts/zip-io.ts
+var encoder = new TextEncoder();
+var crcTable = new Uint32Array(256);
+for (let i = 0; i < 256; i += 1) {
+  let c = i;
+  for (let k = 0; k < 8; k += 1) {
+    c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+  }
+  crcTable[i] = c >>> 0;
+}
+function crc32(data) {
+  let crc = 4294967295;
+  for (const value2 of data) {
+    crc = crcTable[(crc ^ value2) & 255] ^ crc >>> 8;
+  }
+  return (crc ^ 4294967295) >>> 0;
+}
+function asBytes(data) {
+  return typeof data === "string" ? encoder.encode(data) : data;
+}
+function writeUint16(buffer, offset, value2) {
+  buffer[offset] = value2 & 255;
+  buffer[offset + 1] = value2 >>> 8 & 255;
+}
+function writeUint32(buffer, offset, value2) {
+  buffer[offset] = value2 & 255;
+  buffer[offset + 1] = value2 >>> 8 & 255;
+  buffer[offset + 2] = value2 >>> 16 & 255;
+  buffer[offset + 3] = value2 >>> 24 & 255;
+}
+function concat(parts) {
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.length;
+  }
+  return output;
+}
+function createZip(entries) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const nameBytes = encoder.encode(entry.path);
+    const data = asBytes(entry.data);
+    const crc = crc32(data);
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    writeUint32(localHeader, 0, 67324752);
+    writeUint16(localHeader, 4, 20);
+    writeUint16(localHeader, 6, 2048);
+    writeUint16(localHeader, 8, 0);
+    writeUint16(localHeader, 10, 0);
+    writeUint16(localHeader, 12, 0);
+    writeUint32(localHeader, 14, crc);
+    writeUint32(localHeader, 18, data.length);
+    writeUint32(localHeader, 22, data.length);
+    writeUint16(localHeader, 26, nameBytes.length);
+    writeUint16(localHeader, 28, 0);
+    localHeader.set(nameBytes, 30);
+    localParts.push(localHeader, data);
+    const centralHeader = new Uint8Array(46 + nameBytes.length);
+    writeUint32(centralHeader, 0, 33639248);
+    writeUint16(centralHeader, 4, 20);
+    writeUint16(centralHeader, 6, 20);
+    writeUint16(centralHeader, 8, 2048);
+    writeUint16(centralHeader, 10, 0);
+    writeUint16(centralHeader, 12, 0);
+    writeUint16(centralHeader, 14, 0);
+    writeUint32(centralHeader, 16, crc);
+    writeUint32(centralHeader, 20, data.length);
+    writeUint32(centralHeader, 24, data.length);
+    writeUint16(centralHeader, 28, nameBytes.length);
+    writeUint16(centralHeader, 30, 0);
+    writeUint16(centralHeader, 32, 0);
+    writeUint16(centralHeader, 34, 0);
+    writeUint16(centralHeader, 36, 0);
+    writeUint32(centralHeader, 38, 0);
+    writeUint32(centralHeader, 42, offset);
+    centralHeader.set(nameBytes, 46);
+    centralParts.push(centralHeader);
+    offset += localHeader.length + data.length;
+  }
+  const centralDirectory = concat(centralParts);
+  const end = new Uint8Array(22);
+  writeUint32(end, 0, 101010256);
+  writeUint16(end, 4, 0);
+  writeUint16(end, 6, 0);
+  writeUint16(end, 8, entries.length);
+  writeUint16(end, 10, entries.length);
+  writeUint32(end, 12, centralDirectory.length);
+  writeUint32(end, 16, offset);
+  writeUint16(end, 20, 0);
+  return concat([...localParts, centralDirectory, end]);
+}
+
+// src/ts/image-assets.ts
+var DOC_BODY_WIDTH_EMU = 5943600;
+var EMU_PER_PIXEL_AT_96_DPI = 9525;
+function safeMediaName(index2, path2) {
+  const file = path2.split(/[\\/]/).pop() || `image-${index2}.bin`;
+  const ext = file.includes(".") ? file.split(".").pop() : "bin";
+  return `image-${index2}.${String(ext).toLowerCase().replace(/[^a-z0-9]/g, "") || "bin"}`;
+}
+function displaySizeForImage(asset) {
+  const size = imageSize(asset.data);
+  const naturalWidth = (size?.width ?? 320) * EMU_PER_PIXEL_AT_96_DPI;
+  const naturalHeight = (size?.height ?? 240) * EMU_PER_PIXEL_AT_96_DPI;
+  const displayWidth = Math.min(naturalWidth, DOC_BODY_WIDTH_EMU);
+  const displayHeight = Math.round(displayWidth * naturalHeight / naturalWidth);
+  return {
+    width: displayWidth,
+    height: displayHeight,
+    resized: displayWidth < naturalWidth
+  };
+}
+function contentTypeForExt(ext) {
+  switch (ext) {
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "gif":
+      return "image/gif";
+    case "webp":
+      return "image/webp";
+    case "png":
+      return "image/png";
+    default:
+      return "application/octet-stream";
+  }
+}
+function imageSize(data) {
+  if (data.length >= 24 && data[0] === 137 && data[1] === 80 && data[2] === 78 && data[3] === 71) {
+    return { width: readBe32(data, 16), height: readBe32(data, 20) };
+  }
+  if (data.length >= 10 && data[0] === 71 && data[1] === 73 && data[2] === 70) {
+    return { width: readLe16(data, 6), height: readLe16(data, 8) };
+  }
+  if (data.length >= 4 && data[0] === 255 && data[1] === 216) {
+    let offset = 2;
+    while (offset + 9 < data.length) {
+      if (data[offset] !== 255) return void 0;
+      const marker = data[offset + 1];
+      const length = readBe16(data, offset + 2);
+      if (marker >= 192 && marker <= 195) {
+        return { height: readBe16(data, offset + 5), width: readBe16(data, offset + 7) };
+      }
+      offset += 2 + length;
+    }
+  }
+  return void 0;
+}
+function readBe16(data, offset) {
+  return data[offset] << 8 | data[offset + 1];
+}
+function readLe16(data, offset) {
+  return data[offset] | data[offset + 1] << 8;
+}
+function readBe32(data, offset) {
+  return (data[offset] << 24 | data[offset + 1] << 16 | data[offset + 2] << 8 | data[offset + 3]) >>> 0;
+}
+
+// src/ts/xml-utils.ts
+function escapeXml(value2) {
+  return value2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function escapeAttr(value2) {
+  return escapeXml(value2).replace(/"/g, "&quot;");
+}
+function stripHtml(value2) {
+  return value2.replace(/<[^>]*>/g, "");
+}
+
+// src/ts/relationships.ts
+var REL_OFFICE_DOCUMENT = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
+var REL_HYPERLINK = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+var REL_IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+var REL_STYLES = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+var REL_NUMBERING = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
+var REQUIRED_DOCUMENT_RELATIONSHIPS = [
+  { id: "rIdStyles", type: REL_STYLES, target: "styles.xml" },
+  { id: "rIdNumbering", type: REL_NUMBERING, target: "numbering.xml" }
+];
+function addRelationship(context, type, target, targetMode) {
+  const id = `rId${context.nextRelId++}`;
+  context.relationships.push({ id, type, target, targetMode });
+  return id;
+}
+function documentRelsXml(relationships) {
+  const rels = [...REQUIRED_DOCUMENT_RELATIONSHIPS, ...relationships].map((rel) => {
+    const mode = rel.targetMode ? ` TargetMode="${escapeAttr(rel.targetMode)}"` : "";
+    return `<Relationship Id="${rel.id}" Type="${escapeAttr(rel.type)}" Target="${escapeAttr(rel.target)}"${mode}/>`;
+  }).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels}</Relationships>`;
+}
+
+// src/ts/docx-templates.ts
+var XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+var HEADING_STYLES = [
+  { id: "Heading1", name: "heading 1", outlineLevel: 0, size: 32 },
+  { id: "Heading2", name: "heading 2", outlineLevel: 1, size: 28 },
+  { id: "Heading3", name: "heading 3", outlineLevel: 2, size: 24 },
+  { id: "Heading4", name: "heading 4", outlineLevel: 3 },
+  { id: "Heading5", name: "heading 5", outlineLevel: 4 },
+  { id: "Heading6", name: "heading 6", outlineLevel: 5 }
+];
+var BULLET_LEVELS = [
+  { level: 0, format: "bullet", text: "\u2022", indent: 720 },
+  { level: 1, format: "bullet", text: "\u2022", indent: 1440 },
+  { level: 2, format: "bullet", text: "\u2022", indent: 2160 }
+];
+var DECIMAL_LEVELS = [
+  { level: 0, format: "decimal", text: "%1.", indent: 720 },
+  { level: 1, format: "decimal", text: "%2.", indent: 1440 },
+  { level: 2, format: "decimal", text: "%3.", indent: 2160 }
+];
+function packageRelsXml() {
+  return [
+    XML_DECLARATION,
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+    `<Relationship Id="rId1" Type="${REL_OFFICE_DOCUMENT}" Target="word/document.xml"/>`,
+    "</Relationships>"
+  ].join("");
+}
+function stylesXml() {
+  return [
+    XML_DECLARATION,
+    '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">',
+    normalStyleXml(),
+    ...HEADING_STYLES.map(headingStyleXml),
+    quoteStyleXml(),
+    codeStyleXml(),
+    separatorStyleXml(),
+    codeCharStyleXml(),
+    "</w:styles>"
+  ].join("");
+}
+function numberingXml() {
+  return [
+    XML_DECLARATION,
+    '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">',
+    abstractNumberingXml(0, BULLET_LEVELS, "bullet"),
+    abstractNumberingXml(1, DECIMAL_LEVELS, "decimal"),
+    '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>',
+    '<w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>',
+    "</w:numbering>"
+  ].join("");
+}
+function corePropsXml() {
+  return [
+    XML_DECLARATION,
+    '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" ',
+    'xmlns:dc="http://purl.org/dc/elements/1.1/" ',
+    'xmlns:dcterms="http://purl.org/dc/terms/" ',
+    'xmlns:dcmitype="http://purl.org/dc/dcmitype/" ',
+    'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">',
+    "<dc:creator>miku-md2docx</dc:creator>",
+    "<cp:lastModifiedBy>miku-md2docx</cp:lastModifiedBy>",
+    "</cp:coreProperties>"
+  ].join("");
+}
+function appPropsXml() {
+  return [
+    XML_DECLARATION,
+    '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" ',
+    'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">',
+    "<Application>miku-md2docx</Application>",
+    "</Properties>"
+  ].join("");
+}
+function normalStyleXml() {
+  return '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>';
+}
+function headingStyleXml(style) {
+  const sizeXml = style.size ? `<w:sz w:val="${style.size}"/>` : "";
+  return [
+    `<w:style w:type="paragraph" w:styleId="${style.id}">`,
+    `<w:name w:val="${style.name}"/>`,
+    '<w:basedOn w:val="Normal"/>',
+    `<w:pPr><w:outlineLvl w:val="${style.outlineLevel}"/></w:pPr>`,
+    `<w:rPr><w:b/>${sizeXml}</w:rPr>`,
+    "</w:style>"
+  ].join("");
+}
+function quoteStyleXml() {
+  return [
+    '<w:style w:type="paragraph" w:styleId="Quote">',
+    '<w:name w:val="Quote"/>',
+    '<w:basedOn w:val="Normal"/>',
+    '<w:pPr><w:ind w:left="720"/></w:pPr>',
+    "<w:rPr><w:i/></w:rPr>",
+    "</w:style>"
+  ].join("");
+}
+function codeStyleXml() {
+  return [
+    '<w:style w:type="paragraph" w:styleId="Code">',
+    '<w:name w:val="Code"/>',
+    '<w:basedOn w:val="Normal"/>',
+    '<w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/></w:rPr>',
+    "</w:style>"
+  ].join("");
+}
+function separatorStyleXml() {
+  return [
+    '<w:style w:type="paragraph" w:styleId="Separator">',
+    '<w:name w:val="Separator"/>',
+    '<w:basedOn w:val="Normal"/>',
+    '<w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="auto"/></w:pBdr></w:pPr>',
+    "</w:style>"
+  ].join("");
+}
+function codeCharStyleXml() {
+  return [
+    '<w:style w:type="character" w:styleId="CodeChar">',
+    '<w:name w:val="Code Char"/>',
+    '<w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/></w:rPr>',
+    "</w:style>"
+  ].join("");
+}
+function abstractNumberingXml(id, levels, kind) {
+  return [
+    `<w:abstractNum w:abstractNumId="${id}">`,
+    `<w:nsid w:val="${kind === "bullet" ? "5A6B7C01" : "5A6B7C02"}"/>`,
+    '<w:multiLevelType w:val="hybridMultilevel"/>',
+    `<w:tmpl w:val="${kind === "bullet" ? "11111111" : "22222222"}"/>`,
+    ...levels.map(numberingLevelXml),
+    "</w:abstractNum>"
+  ].join("");
+}
+function numberingLevelXml(level) {
+  return [
+    `<w:lvl w:ilvl="${level.level}">`,
+    '<w:start w:val="1"/>',
+    `<w:numFmt w:val="${level.format}"/>`,
+    `<w:lvlText w:val="${level.text}"/>`,
+    '<w:lvlJc w:val="left"/>',
+    `<w:pPr><w:ind w:left="${level.indent}" w:hanging="360"/></w:pPr>`,
+    level.format === "bullet" ? '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:hint="default"/></w:rPr>' : "",
+    "</w:lvl>"
+  ].join("");
+}
+
+// src/ts/docx-package.ts
+function buildDocxEntries(documentXml, context) {
+  return [
+    { path: "[Content_Types].xml", data: contentTypesXml(context.imageMedia) },
+    { path: "_rels/.rels", data: packageRelsXml() },
+    { path: "docProps/app.xml", data: appPropsXml() },
+    { path: "docProps/core.xml", data: corePropsXml() },
+    { path: "word/document.xml", data: documentXml },
+    { path: "word/_rels/document.xml.rels", data: documentRelsXml(context.relationships) },
+    { path: "word/styles.xml", data: stylesXml() },
+    { path: "word/numbering.xml", data: numberingXml() },
+    ...context.imageMedia
+  ];
+}
+function buildDocumentXml(body) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+}
+function contentTypesXml(images) {
+  const defaults = /* @__PURE__ */ new Set(["png", "jpg", "jpeg", "gif", "webp"]);
+  for (const image2 of images) {
+    const ext = image2.path.split(".").pop()?.toLowerCase();
+    if (ext) defaults.add(ext);
+  }
+  const imageDefaults = [...defaults].map((ext) => `<Default Extension="${escapeAttr(ext)}" ContentType="${escapeAttr(contentTypeForExt(ext))}"/>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${imageDefaults}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
+}
+
 // node_modules/bail/index.js
 function bail(error) {
   if (error) {
@@ -10257,181 +10628,19 @@ function remarkGfm(options) {
   toMarkdownExtensions.push(gfmToMarkdown(settings));
 }
 
-// src/ts/zip-io.ts
-var encoder = new TextEncoder();
-var crcTable = new Uint32Array(256);
-for (let i = 0; i < 256; i += 1) {
-  let c = i;
-  for (let k = 0; k < 8; k += 1) {
-    c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
-  }
-  crcTable[i] = c >>> 0;
+// src/ts/anchor-utils.ts
+function normalizeAnchor(value2) {
+  return value2.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-_]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
-function crc32(data) {
-  let crc = 4294967295;
-  for (const value2 of data) {
-    crc = crcTable[(crc ^ value2) & 255] ^ crc >>> 8;
-  }
-  return (crc ^ 4294967295) >>> 0;
-}
-function asBytes(data) {
-  return typeof data === "string" ? encoder.encode(data) : data;
-}
-function writeUint16(buffer, offset, value2) {
-  buffer[offset] = value2 & 255;
-  buffer[offset + 1] = value2 >>> 8 & 255;
-}
-function writeUint32(buffer, offset, value2) {
-  buffer[offset] = value2 & 255;
-  buffer[offset + 1] = value2 >>> 8 & 255;
-  buffer[offset + 2] = value2 >>> 16 & 255;
-  buffer[offset + 3] = value2 >>> 24 & 255;
-}
-function concat(parts) {
-  const total = parts.reduce((sum, part) => sum + part.length, 0);
-  const output = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    output.set(part, offset);
-    offset += part.length;
-  }
-  return output;
-}
-function createZip(entries) {
-  const localParts = [];
-  const centralParts = [];
-  let offset = 0;
-  for (const entry of entries) {
-    const nameBytes = encoder.encode(entry.path);
-    const data = asBytes(entry.data);
-    const crc = crc32(data);
-    const localHeader = new Uint8Array(30 + nameBytes.length);
-    writeUint32(localHeader, 0, 67324752);
-    writeUint16(localHeader, 4, 20);
-    writeUint16(localHeader, 6, 2048);
-    writeUint16(localHeader, 8, 0);
-    writeUint16(localHeader, 10, 0);
-    writeUint16(localHeader, 12, 0);
-    writeUint32(localHeader, 14, crc);
-    writeUint32(localHeader, 18, data.length);
-    writeUint32(localHeader, 22, data.length);
-    writeUint16(localHeader, 26, nameBytes.length);
-    writeUint16(localHeader, 28, 0);
-    localHeader.set(nameBytes, 30);
-    localParts.push(localHeader, data);
-    const centralHeader = new Uint8Array(46 + nameBytes.length);
-    writeUint32(centralHeader, 0, 33639248);
-    writeUint16(centralHeader, 4, 20);
-    writeUint16(centralHeader, 6, 20);
-    writeUint16(centralHeader, 8, 2048);
-    writeUint16(centralHeader, 10, 0);
-    writeUint16(centralHeader, 12, 0);
-    writeUint16(centralHeader, 14, 0);
-    writeUint32(centralHeader, 16, crc);
-    writeUint32(centralHeader, 20, data.length);
-    writeUint32(centralHeader, 24, data.length);
-    writeUint16(centralHeader, 28, nameBytes.length);
-    writeUint16(centralHeader, 30, 0);
-    writeUint16(centralHeader, 32, 0);
-    writeUint16(centralHeader, 34, 0);
-    writeUint16(centralHeader, 36, 0);
-    writeUint32(centralHeader, 38, 0);
-    writeUint32(centralHeader, 42, offset);
-    centralHeader.set(nameBytes, 46);
-    centralParts.push(centralHeader);
-    offset += localHeader.length + data.length;
-  }
-  const centralDirectory = concat(centralParts);
-  const end = new Uint8Array(22);
-  writeUint32(end, 0, 101010256);
-  writeUint16(end, 4, 0);
-  writeUint16(end, 6, 0);
-  writeUint16(end, 8, entries.length);
-  writeUint16(end, 10, entries.length);
-  writeUint32(end, 12, centralDirectory.length);
-  writeUint32(end, 16, offset);
-  writeUint16(end, 20, 0);
-  return concat([...localParts, centralDirectory, end]);
+function extractText(node2) {
+  if (!node2) return "";
+  if (typeof node2.value === "string") return node2.value;
+  return (node2.children ?? []).map((child) => extractText(child)).join("");
 }
 
-// src/ts/core.ts
-var REL_OFFICE_DOCUMENT = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
-var REL_HYPERLINK = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
-var REL_IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-var DOC_BODY_WIDTH_EMU = 5943600;
-var EMU_PER_PIXEL_AT_96_DPI = 9525;
-function convertMarkdownToDocx(markdown, options = {}) {
-  const tree = unified().use(remarkParse).use(remarkFrontmatter, ["yaml"]).use(remarkGfm).parse(markdown);
-  const summary = createSummary();
-  const { headingBookmarks, knownBookmarks } = collectHeadingBookmarks(tree, summary);
-  const context = {
-    summary,
-    relationships: [],
-    headingBookmarks,
-    knownBookmarks,
-    imageMedia: [],
-    nextRelId: 1,
-    nextDocPrId: 1,
-    options
-  };
-  const bodyBlocks = renderBlocks(tree.children ?? [], context);
-  const documentXml = buildDocumentXml(bodyBlocks.join(""));
-  const entries = buildDocxEntries(documentXml, context);
-  return { docx: createZip(entries), summary };
-}
-function formatSummary(summary) {
-  const lines = [
-    `paragraphs: ${summary.paragraphs}`,
-    `headings: ${summary.headings}`,
-    `links: ${summary.links}`,
-    `internalLinks: ${summary.internalLinks}`,
-    `externalLinks: ${summary.externalLinks}`,
-    `unresolvedInternalLinks: ${summary.unresolvedInternalLinks}`,
-    `lists: ${summary.lists}`,
-    `listItems: ${summary.listItems}`,
-    `tables: ${summary.tables}`,
-    `codeBlocks: ${summary.codeBlocks}`,
-    `blockquotes: ${summary.blockquotes}`,
-    `horizontalRules: ${summary.horizontalRules}`,
-    `images: ${summary.images}`,
-    `embeddedImages: ${summary.embeddedImages}`,
-    `missingImages: ${summary.missingImages}`,
-    `resizedImages: ${summary.resizedImages}`,
-    `frontMatter: ${summary.frontMatter}`,
-    `unsupportedHtml: ${summary.unsupportedHtml}`
-  ];
-  if (summary.missingImageDetails.length > 0) {
-    lines.push("missingImageDetails:");
-    for (const detail of summary.missingImageDetails) {
-      lines.push(`- path: ${detail.path}`);
-      lines.push(`  alt: ${detail.alt}`);
-    }
-  }
-  return `${lines.join("\n")}
-`;
-}
-function createSummary() {
-  return {
-    paragraphs: 0,
-    headings: 0,
-    links: 0,
-    internalLinks: 0,
-    externalLinks: 0,
-    unresolvedInternalLinks: 0,
-    lists: 0,
-    listItems: 0,
-    tables: 0,
-    codeBlocks: 0,
-    blockquotes: 0,
-    horizontalRules: 0,
-    images: 0,
-    embeddedImages: 0,
-    missingImages: 0,
-    resizedImages: 0,
-    frontMatter: false,
-    unsupportedHtml: 0,
-    missingImageDetails: []
-  };
+// src/ts/markdown-parser.ts
+function parseMarkdown(markdown) {
+  return unified().use(remarkParse).use(remarkFrontmatter, ["yaml"]).use(remarkGfm).parse(markdown);
 }
 function collectHeadingBookmarks(tree, summary) {
   const bookmarks = /* @__PURE__ */ new WeakMap();
@@ -10455,6 +10664,288 @@ function collectHeadingBookmarks(tree, summary) {
   }
   return { headingBookmarks: bookmarks, knownBookmarks: used };
 }
+
+// src/ts/ooxml-primitives.ts
+function paragraphXml(content3, style, numId, level) {
+  const styleXml = style ? `<w:pStyle w:val="${escapeAttr(style)}"/>` : "";
+  const numXml = numId ? `<w:numPr><w:ilvl w:val="${level ?? 0}"/><w:numId w:val="${numId}"/></w:numPr>` : "";
+  const pPr = styleXml || numXml ? `<w:pPr>${styleXml}${numXml}</w:pPr>` : "";
+  return `<w:p>${pPr}${content3}</w:p>`;
+}
+function runXml(text5, style = {}) {
+  const preserve = /^\s|\s$|\s{2,}/.test(text5) ? ' xml:space="preserve"' : "";
+  const props = [
+    style.bold ? "<w:b/>" : "",
+    style.italic ? "<w:i/>" : "",
+    style.strike ? "<w:strike/>" : "",
+    style.underline ? '<w:u w:val="single"/>' : "",
+    style.code ? '<w:rStyle w:val="CodeChar"/>' : ""
+  ].join("");
+  const rPr = props ? `<w:rPr>${props}</w:rPr>` : "";
+  return `<w:r>${rPr}<w:t${preserve}>${escapeXml(text5)}</w:t></w:r>`;
+}
+function drawingXml(relId, alt, cx, cy, docPrId) {
+  const escapedAlt = escapeAttr(alt);
+  return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${docPrId}" name="Image ${docPrId}" descr="${escapedAlt}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${docPrId}" name="Image ${docPrId}" descr="${escapedAlt}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+}
+function tableXml(rows) {
+  return `<w:tbl>${tablePropertiesXml()}${rows}</w:tbl>`;
+}
+function tableRowXml(cells) {
+  return `<w:tr>${cells}</w:tr>`;
+}
+function tableCellXml(content3) {
+  return `<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr>${paragraphXml(content3)}</w:tc>`;
+}
+function tablePropertiesXml() {
+  return [
+    '<w:tblPr><w:tblW w:w="0" w:type="auto"/>',
+    "<w:tblBorders>",
+    '<w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>',
+    '<w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>',
+    '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>',
+    '<w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>',
+    '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>',
+    '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>',
+    "</w:tblBorders></w:tblPr>"
+  ].join("");
+}
+
+// src/ts/ooxml-image-renderer.ts
+function renderImage(node2, context) {
+  const url = String(node2.url ?? "");
+  const alt = String(node2.alt ?? "");
+  context.summary.images += 1;
+  const asset = context.options.imageLoader?.(url);
+  if (!asset) {
+    context.summary.missingImages += 1;
+    context.summary.missingImageDetails.push({ path: url, alt });
+    const fallback = `[Missing image: ${alt || url}]`;
+    return { xml: runXml(fallback), text: fallback };
+  }
+  const mediaPath = `word/media/${safeMediaName(context.summary.embeddedImages + 1, asset.path)}`;
+  const relId = addRelationship(context, REL_IMAGE, mediaPath.replace(/^word\//, ""));
+  const displaySize = displaySizeForImage(asset);
+  if (displaySize.resized) {
+    context.summary.resizedImages += 1;
+  }
+  context.summary.embeddedImages += 1;
+  context.imageMedia.push({ path: mediaPath, data: asset.data });
+  return {
+    xml: drawingXml(relId, alt, displaySize.width, displaySize.height, context.nextDocPrId++),
+    text: alt
+  };
+}
+
+// src/ts/ooxml-link-renderer.ts
+function renderLink(node2, context, inherited, renderInlineChildren2) {
+  context.summary.links += 1;
+  const url = String(node2.url ?? "");
+  const inline = renderInlineChildren2(node2.children ?? [], context, inherited);
+  if (url.startsWith("#")) {
+    return renderInternalLink(url, inline, context);
+  }
+  return renderExternalLink(url, inline, context);
+}
+function renderInternalLink(url, inline, context) {
+  context.summary.internalLinks += 1;
+  const anchor = normalizeAnchor(url.slice(1));
+  if (context.knownBookmarks.has(anchor)) {
+    return {
+      xml: `<w:hyperlink w:anchor="${escapeAttr(anchor)}" w:history="1">${inline.xml}</w:hyperlink>`,
+      text: inline.text
+    };
+  }
+  context.summary.unresolvedInternalLinks += 1;
+  return inline;
+}
+function renderExternalLink(url, inline, context) {
+  context.summary.externalLinks += 1;
+  const relId = addRelationship(context, REL_HYPERLINK, url, "External");
+  return {
+    xml: `<w:hyperlink r:id="${relId}" w:history="1">${inline.xml}</w:hyperlink>`,
+    text: inline.text
+  };
+}
+
+// src/ts/ooxml-inline-renderer.ts
+function renderInlineChildren(nodes, context, inherited = {}) {
+  const rendered = [];
+  let currentStyle = { ...inherited };
+  for (let index2 = 0; index2 < nodes.length; index2 += 1) {
+    const node2 = nodes[index2];
+    if (node2.type === "html") {
+      const html2 = String(node2.value ?? "").trim();
+      if (/^<ins>$/i.test(html2)) {
+        currentStyle = { ...currentStyle, underline: true };
+        continue;
+      }
+      if (/^<\/ins>$/i.test(html2)) {
+        currentStyle = { ...currentStyle, underline: false };
+        continue;
+      }
+      const linkOpen = html2.match(/^<a\s+[^>]*href=["']([^"']+)["'][^>]*>$/i);
+      if (linkOpen) {
+        const collected = collectUntilClosingHtml(nodes, index2 + 1, "a");
+        rendered.push(renderLink({ url: linkOpen[1], children: collected.children }, context, currentStyle, renderInlineChildren));
+        index2 = collected.endIndex;
+        continue;
+      }
+    }
+    rendered.push(renderInline(node2, context, currentStyle));
+  }
+  return {
+    xml: rendered.map((part) => part.xml).join(""),
+    text: rendered.map((part) => part.text).join("")
+  };
+}
+function renderSupportedHtml(value2, context, inherited = {}) {
+  const trimmed = value2.trim();
+  if (/^<br\s*\/?>$/i.test(trimmed)) {
+    return { xml: "<w:r><w:br/></w:r>", text: "\n" };
+  }
+  const ins = trimmed.match(/^<ins>([\s\S]*)<\/ins>$/i);
+  if (ins) {
+    return { xml: runXml(stripHtml(ins[1]), { ...inherited, underline: true }), text: stripHtml(ins[1]) };
+  }
+  const link2 = trimmed.match(/^<a\s+[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*)<\/a>$/i);
+  if (link2) {
+    return renderLink({ url: link2[1], children: [{ type: "text", value: stripHtml(link2[2]) }] }, context, inherited, renderInlineChildren);
+  }
+  const image2 = trimmed.match(/^<img\s+[^>]*src=["']([^"']+)["'][^>]*>/i);
+  if (image2) {
+    const alt = trimmed.match(/\salt=["']([^"']*)["']/i)?.[1] ?? "";
+    return renderImage({ url: image2[1], alt }, context);
+  }
+  context.summary.unsupportedHtml += 1;
+  const text5 = stripHtml(value2);
+  return { xml: runXml(text5, inherited), text: text5 };
+}
+function collectUntilClosingHtml(nodes, startIndex, tagName) {
+  const children = [];
+  for (let index2 = startIndex; index2 < nodes.length; index2 += 1) {
+    const node2 = nodes[index2];
+    if (node2.type === "html" && new RegExp(`^<\\/${tagName}>$`, "i").test(String(node2.value ?? "").trim())) {
+      return { children, endIndex: index2 };
+    }
+    children.push(node2);
+  }
+  return { children, endIndex: nodes.length - 1 };
+}
+function renderInline(node2, context, inherited) {
+  switch (node2.type) {
+    case "text":
+      return { xml: runXml(String(node2.value ?? ""), inherited), text: String(node2.value ?? "") };
+    case "strong":
+      return renderInlineChildren(node2.children ?? [], context, { ...inherited, bold: true });
+    case "emphasis":
+      return renderInlineChildren(node2.children ?? [], context, { ...inherited, italic: true });
+    case "delete":
+      return renderInlineChildren(node2.children ?? [], context, { ...inherited, strike: true });
+    case "inlineCode":
+      return { xml: runXml(String(node2.value ?? ""), { ...inherited, code: true }), text: String(node2.value ?? "") };
+    case "break":
+      return { xml: "<w:r><w:br/></w:r>", text: "\n" };
+    case "link":
+      return renderLink(node2, context, inherited, renderInlineChildren);
+    case "image":
+      return renderImage(node2, context);
+    case "html":
+      return renderSupportedHtml(String(node2.value ?? ""), context, inherited);
+    default:
+      return renderInlineChildren(node2.children ?? [], context, inherited);
+  }
+}
+
+// src/ts/ooxml-block-renderers.ts
+function renderParagraph(node2, context, style = "Normal") {
+  context.summary.paragraphs += 1;
+  const inline = renderInlineChildren(node2.children ?? [], context);
+  if (!inline.xml) {
+    return paragraphXml(runXml(""));
+  }
+  return paragraphXml(inline.xml, style);
+}
+function renderHeading(node2, context) {
+  context.summary.headings += 1;
+  const level = Math.min(Math.max(Number(node2.depth) || 1, 1), 6);
+  const bookmark = context.headingBookmarks.get(node2);
+  const bookmarkStart = bookmark ? `<w:bookmarkStart w:id="${context.summary.headings}" w:name="${escapeAttr(bookmark)}"/>` : "";
+  const bookmarkEnd = bookmark ? `<w:bookmarkEnd w:id="${context.summary.headings}"/>` : "";
+  const inline = renderInlineChildren(node2.children ?? [], context);
+  return paragraphXml(`${bookmarkStart}${inline.xml}${bookmarkEnd}`, `Heading${level}`);
+}
+function renderList(node2, context, level) {
+  context.summary.lists += 1;
+  const ordered = Boolean(node2.ordered);
+  const blocks = [];
+  for (const item of node2.children ?? []) {
+    blocks.push(renderListItem(item, context, ordered, level));
+    for (const childList of nestedLists(item)) {
+      blocks.push(...renderList(childList, context, level + 1));
+    }
+  }
+  return blocks;
+}
+function renderTable(node2, context) {
+  context.summary.tables += 1;
+  const rows = node2.children ?? [];
+  const rowXml = rows.map((row, rowIndex) => renderTableRow(row, rowIndex, context)).join("");
+  return tableXml(rowXml);
+}
+function renderCodeBlock(node2, context) {
+  context.summary.codeBlocks += 1;
+  const lines = String(node2.value ?? "").split(/\r?\n/);
+  return lines.map((line) => paragraphXml(runXml(line, { code: true }), "Code"));
+}
+function renderBlockquote(node2, context) {
+  const blocks = [];
+  for (const child of node2.children ?? []) {
+    if (child.type === "paragraph") {
+      blocks.push(renderParagraph(child, context, "Quote"));
+    } else if (child.type === "blockquote") {
+      blocks.push(...renderBlockquote(child, context));
+    }
+  }
+  return blocks;
+}
+function renderHorizontalRule() {
+  return paragraphXml(runXml("----------"), "Separator");
+}
+function renderHtmlBlock(node2, context) {
+  const value2 = String(node2.value ?? "");
+  const inline = renderSupportedHtml(value2, context);
+  if (inline.xml) {
+    context.summary.paragraphs += 1;
+    return [paragraphXml(inline.xml)];
+  }
+  context.summary.unsupportedHtml += 1;
+  const text5 = stripHtml(value2).trim();
+  return text5 ? [paragraphXml(runXml(text5))] : [];
+}
+function renderListItem(item, context, ordered, level) {
+  const taskPrefix = typeof item.checked === "boolean" ? `${item.checked ? "[x]" : "[ ]"} ` : "";
+  const paragraph2 = (item.children ?? []).find((child) => child.type === "paragraph");
+  const paragraphChildren = paragraph2?.children ?? [];
+  const inlineChildren = taskPrefix ? [{ type: "text", value: taskPrefix }, ...paragraphChildren] : paragraphChildren;
+  const itemInline = paragraph2 ? renderInlineChildren(inlineChildren, context).xml : runXml(taskPrefix.trim());
+  context.summary.listItems += 1;
+  return paragraphXml(itemInline, void 0, ordered ? "2" : "1", level);
+}
+function nestedLists(item) {
+  return (item.children ?? []).filter((child) => child.type === "list");
+}
+function renderTableRow(row, rowIndex, context) {
+  const cells = row.children ?? [];
+  const cellXml = cells.map((cell) => renderTableCell(cell, rowIndex, context)).join("");
+  return tableRowXml(cellXml);
+}
+function renderTableCell(cell, rowIndex, context) {
+  const inline = renderInlineChildren(cell.children ?? [], context, { bold: rowIndex === 0 });
+  return tableCellXml(inline.xml || runXml(""));
+}
+
+// src/ts/ooxml-renderer.ts
 function renderBlocks(nodes, context, listLevel = 0) {
   const blocks = [];
   for (const node2 of nodes) {
@@ -10493,361 +10984,82 @@ function renderBlocks(nodes, context, listLevel = 0) {
   }
   return blocks;
 }
-function renderParagraph(node2, context, style = "Normal") {
-  context.summary.paragraphs += 1;
-  const inline = renderInlineChildren(node2.children ?? [], context);
-  if (!inline.xml) {
-    return paragraphXml(runXml(""));
-  }
-  return paragraphXml(inline.xml, style);
-}
-function renderHeading(node2, context) {
-  context.summary.headings += 1;
-  const level = Math.min(Math.max(Number(node2.depth) || 1, 1), 6);
-  const bookmark = context.headingBookmarks.get(node2);
-  const bookmarkStart = bookmark ? `<w:bookmarkStart w:id="${context.summary.headings}" w:name="${escapeAttr(bookmark)}"/>` : "";
-  const bookmarkEnd = bookmark ? `<w:bookmarkEnd w:id="${context.summary.headings}"/>` : "";
-  const inline = renderInlineChildren(node2.children ?? [], context);
-  return paragraphXml(`${bookmarkStart}${inline.xml}${bookmarkEnd}`, `Heading${level}`);
-}
-function renderList(node2, context, level) {
-  context.summary.lists += 1;
-  const ordered = Boolean(node2.ordered);
-  const blocks = [];
-  for (const item of node2.children ?? []) {
-    const taskPrefix = typeof item.checked === "boolean" ? `${item.checked ? "[x]" : "[ ]"} ` : "";
-    const paragraph2 = (item.children ?? []).find((child) => child.type === "paragraph");
-    const itemInline = paragraph2 ? renderInlineChildren([{ type: "text", value: taskPrefix }, ...paragraph2.children ?? []], context).xml : runXml(taskPrefix.trim());
-    context.summary.listItems += 1;
-    blocks.push(paragraphXml(itemInline, void 0, ordered ? "2" : "1", level));
-    const nested = (item.children ?? []).filter((child) => child.type === "list");
-    for (const childList of nested) {
-      blocks.push(...renderList(childList, context, level + 1));
-    }
-  }
-  return blocks;
-}
-function renderTable(node2, context) {
-  context.summary.tables += 1;
-  const rows = node2.children ?? [];
-  const rowXml = rows.map((row, rowIndex) => {
-    const cells = row.children ?? [];
-    const cellXml = cells.map((cell) => {
-      const inline = renderInlineChildren(cell.children ?? [], context, { bold: rowIndex === 0 });
-      return `<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr>${paragraphXml(inline.xml || runXml(""))}</w:tc>`;
-    }).join("");
-    return `<w:tr>${cellXml}</w:tr>`;
-  }).join("");
-  return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tblBorders></w:tblPr>${rowXml}</w:tbl>`;
-}
-function renderCodeBlock(node2, context) {
-  context.summary.codeBlocks += 1;
-  const lines = String(node2.value ?? "").split(/\r?\n/);
-  return lines.map((line) => paragraphXml(runXml(line, { code: true }), "Code"));
-}
-function renderBlockquote(node2, context) {
-  const blocks = [];
-  for (const child of node2.children ?? []) {
-    if (child.type === "paragraph") {
-      blocks.push(renderParagraph(child, context, "Quote"));
-    } else if (child.type === "blockquote") {
-      blocks.push(...renderBlockquote(child, context));
-    }
-  }
-  return blocks;
-}
-function renderHorizontalRule() {
-  return paragraphXml(runXml("----------"), "Separator");
-}
-function renderHtmlBlock(node2, context) {
-  const value2 = String(node2.value ?? "");
-  const inline = renderSupportedHtml(value2, context);
-  if (inline.xml) {
-    context.summary.paragraphs += 1;
-    return [paragraphXml(inline.xml)];
-  }
-  context.summary.unsupportedHtml += 1;
-  const text5 = stripHtml(value2).trim();
-  return text5 ? [paragraphXml(runXml(text5))] : [];
-}
-function renderInlineChildren(nodes, context, inherited = {}) {
-  const rendered = [];
-  let currentStyle = { ...inherited };
-  for (let index2 = 0; index2 < nodes.length; index2 += 1) {
-    const node2 = nodes[index2];
-    if (node2.type === "html") {
-      const html2 = String(node2.value ?? "").trim();
-      if (/^<ins>$/i.test(html2)) {
-        currentStyle = { ...currentStyle, underline: true };
-        continue;
-      }
-      if (/^<\/ins>$/i.test(html2)) {
-        currentStyle = { ...currentStyle, underline: false };
-        continue;
-      }
-      const linkOpen = html2.match(/^<a\s+[^>]*href=["']([^"']+)["'][^>]*>$/i);
-      if (linkOpen) {
-        const collected = collectUntilClosingHtml(nodes, index2 + 1, "a");
-        rendered.push(renderLink({ url: linkOpen[1], children: collected.children }, context, currentStyle));
-        index2 = collected.endIndex;
-        continue;
-      }
-    }
-    rendered.push(renderInline(node2, context, currentStyle));
-  }
+
+// src/ts/summary.ts
+function createSummary() {
   return {
-    xml: rendered.map((part) => part.xml).join(""),
-    text: rendered.map((part) => part.text).join("")
+    paragraphs: 0,
+    headings: 0,
+    links: 0,
+    internalLinks: 0,
+    externalLinks: 0,
+    unresolvedInternalLinks: 0,
+    lists: 0,
+    listItems: 0,
+    tables: 0,
+    codeBlocks: 0,
+    blockquotes: 0,
+    horizontalRules: 0,
+    images: 0,
+    embeddedImages: 0,
+    missingImages: 0,
+    resizedImages: 0,
+    frontMatter: false,
+    unsupportedHtml: 0,
+    missingImageDetails: []
   };
 }
-function collectUntilClosingHtml(nodes, startIndex, tagName) {
-  const children = [];
-  for (let index2 = startIndex; index2 < nodes.length; index2 += 1) {
-    const node2 = nodes[index2];
-    if (node2.type === "html" && new RegExp(`^<\\/${tagName}>$`, "i").test(String(node2.value ?? "").trim())) {
-      return { children, endIndex: index2 };
-    }
-    children.push(node2);
-  }
-  return { children, endIndex: nodes.length - 1 };
-}
-function renderInline(node2, context, inherited) {
-  switch (node2.type) {
-    case "text":
-      return { xml: runXml(String(node2.value ?? ""), inherited), text: String(node2.value ?? "") };
-    case "strong":
-      return renderInlineChildren(node2.children ?? [], context, { ...inherited, bold: true });
-    case "emphasis":
-      return renderInlineChildren(node2.children ?? [], context, { ...inherited, italic: true });
-    case "delete":
-      return renderInlineChildren(node2.children ?? [], context, { ...inherited, strike: true });
-    case "inlineCode":
-      return { xml: runXml(String(node2.value ?? ""), { ...inherited, code: true }), text: String(node2.value ?? "") };
-    case "break":
-      return { xml: "<w:r><w:br/></w:r>", text: "\n" };
-    case "link":
-      return renderLink(node2, context, inherited);
-    case "image":
-      return renderImage(node2, context);
-    case "html":
-      return renderSupportedHtml(String(node2.value ?? ""), context, inherited);
-    default:
-      return renderInlineChildren(node2.children ?? [], context, inherited);
-  }
-}
-function renderLink(node2, context, inherited) {
-  context.summary.links += 1;
-  const url = String(node2.url ?? "");
-  const inline = renderInlineChildren(node2.children ?? [], context, inherited);
-  if (url.startsWith("#")) {
-    context.summary.internalLinks += 1;
-    const anchor = normalizeAnchor(url.slice(1));
-    if (context.knownBookmarks.has(anchor)) {
-      return {
-        xml: `<w:hyperlink w:anchor="${escapeAttr(anchor)}" w:history="1">${inline.xml}</w:hyperlink>`,
-        text: inline.text
-      };
-    }
-    context.summary.unresolvedInternalLinks += 1;
-    return inline;
-  }
-  context.summary.externalLinks += 1;
-  const relId = addRelationship(context, REL_HYPERLINK, url, "External");
-  return {
-    xml: `<w:hyperlink r:id="${relId}" w:history="1">${inline.xml}</w:hyperlink>`,
-    text: inline.text
-  };
-}
-function renderImage(node2, context) {
-  const url = String(node2.url ?? "");
-  const alt = String(node2.alt ?? "");
-  context.summary.images += 1;
-  const asset = context.options.imageLoader?.(url);
-  if (!asset) {
-    context.summary.missingImages += 1;
-    context.summary.missingImageDetails.push({ path: url, alt });
-    const fallback = `[Missing image: ${alt || url}]`;
-    return { xml: runXml(fallback), text: fallback };
-  }
-  const mediaPath = `word/media/${safeMediaName(context.summary.embeddedImages + 1, asset.path)}`;
-  const relId = addRelationship(context, REL_IMAGE, mediaPath.replace(/^word\//, ""));
-  const size = imageSize(asset.data);
-  const naturalWidth = (size?.width ?? 320) * EMU_PER_PIXEL_AT_96_DPI;
-  const naturalHeight = (size?.height ?? 240) * EMU_PER_PIXEL_AT_96_DPI;
-  const displayWidth = Math.min(naturalWidth, DOC_BODY_WIDTH_EMU);
-  const displayHeight = Math.round(displayWidth * naturalHeight / naturalWidth);
-  if (displayWidth < naturalWidth) {
-    context.summary.resizedImages += 1;
-  }
-  context.summary.embeddedImages += 1;
-  context.imageMedia.push({ path: mediaPath, data: asset.data });
-  return {
-    xml: drawingXml(relId, alt, displayWidth, displayHeight, context.nextDocPrId++),
-    text: alt
-  };
-}
-function renderSupportedHtml(value2, context, inherited = {}) {
-  const trimmed = value2.trim();
-  if (/^<br\s*\/?>$/i.test(trimmed)) {
-    return { xml: "<w:r><w:br/></w:r>", text: "\n" };
-  }
-  const ins = trimmed.match(/^<ins>([\s\S]*)<\/ins>$/i);
-  if (ins) {
-    return { xml: runXml(stripHtml(ins[1]), { ...inherited, underline: true }), text: stripHtml(ins[1]) };
-  }
-  const link2 = trimmed.match(/^<a\s+[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*)<\/a>$/i);
-  if (link2) {
-    return renderLink({ url: link2[1], children: [{ type: "text", value: stripHtml(link2[2]) }] }, context, inherited);
-  }
-  const image2 = trimmed.match(/^<img\s+[^>]*src=["']([^"']+)["'][^>]*>/i);
-  if (image2) {
-    const alt = trimmed.match(/\salt=["']([^"']*)["']/i)?.[1] ?? "";
-    return renderImage({ url: image2[1], alt }, context);
-  }
-  context.summary.unsupportedHtml += 1;
-  const text5 = stripHtml(value2);
-  return { xml: runXml(text5, inherited), text: text5 };
-}
-function paragraphXml(content3, style, numId, level) {
-  const styleXml = style ? `<w:pStyle w:val="${escapeAttr(style)}"/>` : "";
-  const numXml = numId ? `<w:numPr><w:ilvl w:val="${level ?? 0}"/><w:numId w:val="${numId}"/></w:numPr>` : "";
-  const pPr = styleXml || numXml ? `<w:pPr>${styleXml}${numXml}</w:pPr>` : "";
-  return `<w:p>${pPr}${content3}</w:p>`;
-}
-function runXml(text5, style = {}) {
-  const preserve = /^\s|\s$|\s{2,}/.test(text5) ? ' xml:space="preserve"' : "";
-  const props = [
-    style.bold ? "<w:b/>" : "",
-    style.italic ? "<w:i/>" : "",
-    style.strike ? "<w:strike/>" : "",
-    style.underline ? '<w:u w:val="single"/>' : "",
-    style.code ? '<w:rStyle w:val="CodeChar"/>' : ""
-  ].join("");
-  const rPr = props ? `<w:rPr>${props}</w:rPr>` : "";
-  return `<w:r>${rPr}<w:t${preserve}>${escapeXml(text5)}</w:t></w:r>`;
-}
-function drawingXml(relId, alt, cx, cy, docPrId) {
-  const escapedAlt = escapeAttr(alt);
-  return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${docPrId}" name="Image ${docPrId}" descr="${escapedAlt}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${docPrId}" name="Image ${docPrId}" descr="${escapedAlt}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
-}
-function addRelationship(context, type, target, targetMode) {
-  const id = `rId${context.nextRelId++}`;
-  context.relationships.push({ id, type, target, targetMode });
-  return id;
-}
-function buildDocxEntries(documentXml, context) {
-  return [
-    { path: "[Content_Types].xml", data: contentTypesXml(context.imageMedia) },
-    { path: "_rels/.rels", data: packageRelsXml() },
-    { path: "docProps/app.xml", data: appPropsXml() },
-    { path: "docProps/core.xml", data: corePropsXml() },
-    { path: "word/document.xml", data: documentXml },
-    { path: "word/_rels/document.xml.rels", data: documentRelsXml(context.relationships) },
-    { path: "word/styles.xml", data: stylesXml() },
-    { path: "word/numbering.xml", data: numberingXml() },
-    ...context.imageMedia
+function formatSummary(summary) {
+  const lines = [
+    `paragraphs: ${summary.paragraphs}`,
+    `headings: ${summary.headings}`,
+    `links: ${summary.links}`,
+    `internalLinks: ${summary.internalLinks}`,
+    `externalLinks: ${summary.externalLinks}`,
+    `unresolvedInternalLinks: ${summary.unresolvedInternalLinks}`,
+    `lists: ${summary.lists}`,
+    `listItems: ${summary.listItems}`,
+    `tables: ${summary.tables}`,
+    `codeBlocks: ${summary.codeBlocks}`,
+    `blockquotes: ${summary.blockquotes}`,
+    `horizontalRules: ${summary.horizontalRules}`,
+    `images: ${summary.images}`,
+    `embeddedImages: ${summary.embeddedImages}`,
+    `missingImages: ${summary.missingImages}`,
+    `resizedImages: ${summary.resizedImages}`,
+    `frontMatter: ${summary.frontMatter}`,
+    `unsupportedHtml: ${summary.unsupportedHtml}`
   ];
-}
-function buildDocumentXml(body) {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;
-}
-function contentTypesXml(images) {
-  const defaults = /* @__PURE__ */ new Set(["png", "jpg", "jpeg", "gif", "webp"]);
-  for (const image2 of images) {
-    const ext = image2.path.split(".").pop()?.toLowerCase();
-    if (ext) defaults.add(ext);
-  }
-  const imageDefaults = [...defaults].map((ext) => `<Default Extension="${escapeAttr(ext)}" ContentType="${escapeAttr(contentTypeForExt(ext))}"/>`).join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${imageDefaults}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
-}
-function packageRelsXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL_OFFICE_DOCUMENT}" Target="word/document.xml"/></Relationships>`;
-}
-function documentRelsXml(relationships) {
-  const rels = relationships.map((rel) => {
-    const mode = rel.targetMode ? ` TargetMode="${escapeAttr(rel.targetMode)}"` : "";
-    return `<Relationship Id="${rel.id}" Type="${escapeAttr(rel.type)}" Target="${escapeAttr(rel.target)}"${mode}/>`;
-  }).join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels}</Relationships>`;
-}
-function stylesXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="2"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading4"><w:name w:val="heading 4"/><w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="3"/></w:pPr><w:rPr><w:b/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading5"><w:name w:val="heading 5"/><w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="4"/></w:pPr><w:rPr><w:b/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading6"><w:name w:val="heading 6"/><w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="5"/></w:pPr><w:rPr><w:b/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720"/></w:pPr><w:rPr><w:i/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Code"><w:name w:val="Code"/><w:basedOn w:val="Normal"/><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Separator"><w:name w:val="Separator"/><w:basedOn w:val="Normal"/><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="auto"/></w:pBdr></w:pPr></w:style><w:style w:type="character" w:styleId="CodeChar"><w:name w:val="Code Char"/><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/></w:rPr></w:style></w:styles>`;
-}
-function numberingXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl><w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr></w:lvl><w:lvl w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:pPr><w:ind w:left="2160" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="2"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl><w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%2."/><w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr></w:lvl><w:lvl w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%3."/><w:pPr><w:ind w:left="2160" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="2"/></w:num></w:numbering>`;
-}
-function corePropsXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>miku-md2docx</dc:creator><cp:lastModifiedBy>miku-md2docx</cp:lastModifiedBy></cp:coreProperties>`;
-}
-function appPropsXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>miku-md2docx</Application></Properties>`;
-}
-function normalizeAnchor(value2) {
-  return value2.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-_]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-}
-function extractText(node2) {
-  if (!node2) return "";
-  if (typeof node2.value === "string") return node2.value;
-  return (node2.children ?? []).map((child) => extractText(child)).join("");
-}
-function stripHtml(value2) {
-  return value2.replace(/<[^>]*>/g, "");
-}
-function safeMediaName(index2, path2) {
-  const file = path2.split(/[\\/]/).pop() || `image-${index2}.bin`;
-  const ext = file.includes(".") ? file.split(".").pop() : "bin";
-  return `image-${index2}.${String(ext).toLowerCase().replace(/[^a-z0-9]/g, "") || "bin"}`;
-}
-function imageSize(data) {
-  if (data.length >= 24 && data[0] === 137 && data[1] === 80 && data[2] === 78 && data[3] === 71) {
-    return { width: readBe32(data, 16), height: readBe32(data, 20) };
-  }
-  if (data.length >= 10 && data[0] === 71 && data[1] === 73 && data[2] === 70) {
-    return { width: readLe16(data, 6), height: readLe16(data, 8) };
-  }
-  if (data.length >= 4 && data[0] === 255 && data[1] === 216) {
-    let offset = 2;
-    while (offset + 9 < data.length) {
-      if (data[offset] !== 255) return void 0;
-      const marker = data[offset + 1];
-      const length = readBe16(data, offset + 2);
-      if (marker >= 192 && marker <= 195) {
-        return { height: readBe16(data, offset + 5), width: readBe16(data, offset + 7) };
-      }
-      offset += 2 + length;
+  if (summary.missingImageDetails.length > 0) {
+    lines.push("missingImageDetails:");
+    for (const detail of summary.missingImageDetails) {
+      lines.push(`- path: ${detail.path}`);
+      lines.push(`  alt: ${detail.alt}`);
     }
   }
-  return void 0;
+  return `${lines.join("\n")}
+`;
 }
-function readBe16(data, offset) {
-  return data[offset] << 8 | data[offset + 1];
-}
-function readLe16(data, offset) {
-  return data[offset] | data[offset + 1] << 8;
-}
-function readBe32(data, offset) {
-  return (data[offset] << 24 | data[offset + 1] << 16 | data[offset + 2] << 8 | data[offset + 3]) >>> 0;
-}
-function contentTypeForExt(ext) {
-  switch (ext) {
-    case "jpg":
-    case "jpeg":
-      return "image/jpeg";
-    case "gif":
-      return "image/gif";
-    case "webp":
-      return "image/webp";
-    case "png":
-      return "image/png";
-    default:
-      return "application/octet-stream";
-  }
-}
-function escapeXml(value2) {
-  return value2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-function escapeAttr(value2) {
-  return escapeXml(value2).replace(/"/g, "&quot;");
+
+// src/ts/core.ts
+function convertMarkdownToDocx(markdown, options = {}) {
+  const tree = parseMarkdown(markdown);
+  const summary = createSummary();
+  const { headingBookmarks, knownBookmarks } = collectHeadingBookmarks(tree, summary);
+  const context = {
+    summary,
+    relationships: [],
+    headingBookmarks,
+    knownBookmarks,
+    imageMedia: [],
+    nextRelId: 1,
+    nextDocPrId: 1,
+    options
+  };
+  const bodyBlocks = renderBlocks(tree.children ?? [], context);
+  const documentXml = buildDocumentXml(bodyBlocks.join(""));
+  const entries = buildDocxEntries(documentXml, context);
+  return { docx: createZip(entries), summary };
 }
 
 // src/ts/main.ts
@@ -10864,7 +11076,7 @@ convertButton.addEventListener("click", () => {
 });
 downloadButton.addEventListener("click", () => {
   if (!lastDocx) return;
-  const blob = new Blob([lastDocx], {
+  const blob = new Blob([toArrayBuffer(lastDocx)], {
     type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   });
   const url = URL.createObjectURL(blob);
@@ -10911,6 +11123,11 @@ function outputName(inputName) {
 }
 function basename2(path2) {
   return path2.split(/[\\/]/).pop() || path2;
+}
+function toArrayBuffer(bytes) {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
 }
 function setStatus(message) {
   statusOutput.textContent = message;

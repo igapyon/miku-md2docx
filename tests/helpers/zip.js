@@ -42,3 +42,22 @@ export function unzipTextEntries(bytes) {
   }
   return textEntries;
 }
+
+export function normalizeXml(xml) {
+  return xml
+    .replace(/></g, ">\n<")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function expectXmlLines(xml, lines) {
+  const normalized = normalizeXml(xml);
+  const compact = normalized.replace(/\n/g, "");
+  for (const line of lines) {
+    if (!compact.includes(line.replace(/\n/g, ""))) {
+      throw new Error(`Expected XML fragment was not found:\n${line}\n\nActual XML:\n${normalized}`);
+    }
+  }
+}
