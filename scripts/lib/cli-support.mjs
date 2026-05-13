@@ -1,6 +1,6 @@
 import { dirname, resolve } from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
-import { convertMarkdownToDocx, formatSummary } from "../../src/ts/core.ts";
+import { convertMarkdownToDocx, formatSummary } from "../../src/js/core.js";
 
 const packageVersion = readPackageVersion();
 
