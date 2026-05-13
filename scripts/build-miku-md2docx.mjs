@@ -20,6 +20,16 @@ await build({
   format: "esm",
   platform: "node",
   target: "es2022",
+  outfile: "src/js/core.js",
+  sourcemap: false
+});
+
+await build({
+  entryPoints: ["src/ts/core.ts"],
+  bundle: true,
+  format: "esm",
+  platform: "node",
+  target: "es2022",
   outfile: "dist/core.js",
   sourcemap: false
 });
