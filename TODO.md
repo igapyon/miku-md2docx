@@ -1,5 +1,13 @@
 # TODO
 
+## Current Status
+
+Initial first-cut development is complete.
+
+The current repository has a working Markdown to DOCX implementation, CLI, browser UI, automated tests, manual DOCX smoke review, and optional structural roundtrip smoke.
+
+Remaining unchecked items are follow-up decisions, not blockers for the initial development milestone.
+
 ## First Cut
 
 - [x] Scaffold TypeScript and CLI project structure.
@@ -24,10 +32,11 @@
 
 ## Remaining Follow-up
 
-- [ ] Manually open generated `.docx` files in Microsoft Word and LibreOffice.
+- [x] Manually open generated `.docx` smoke file in Microsoft Word and LibreOffice.
 - [ ] Keep unordered and task lists as real DOCX list semantics; do not replace them with literal bullet characters as a compatibility workaround.
 - [ ] Decide whether remote image URLs should be reported with a dedicated summary field.
 - [ ] Decide whether OOXML golden checks should stay inline or move to fixture files as coverage grows.
+- [x] Add an optional structural roundtrip smoke with `miku-md2docx` and `miku-docx2md` (`md2docx -> docx2md -> normalized Markdown/structure`), without requiring exact Markdown text equality.
 
 ## Future
 
