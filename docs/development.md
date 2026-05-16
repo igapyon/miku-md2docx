@@ -12,11 +12,11 @@ The initial first-cut development is complete.
 The current repository has:
 
 - Markdown to DOCX conversion
-- browser UI
 - Node.js CLI
 - automated tests
 - manual DOCX smoke review in Microsoft Word and LibreOffice
 - optional structural roundtrip smoke with `miku-docx2md`
+- separated Web App repository at <https://github.com/igapyon/miku-md2docx-web>
 
 See [TODO.md](../TODO.md) for follow-up decisions.
 
@@ -71,6 +71,14 @@ npm run smoke:bundle
 
 Release asset upload is handled by `.github/workflows/release-assets.yml` on
 `v*` tag pushes.
+
+## Web App
+
+The browser UI, Single-file Web App artifact, browser tests, and Web release
+assets are maintained in the separated `miku-md2docx-web` repository.
+
+This main application repository remains the owner of the product core, CLI,
+summary and diagnostics vocabulary, and CLI runtime bundle.
 
 ## Repository Operation
 
