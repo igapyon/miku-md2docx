@@ -15,7 +15,7 @@ async function runBundle(args) {
 
 async function main() {
   const version = await runBundle(["--version"]);
-  if (!/^0\.5\.0\s*$/.test(version.stdout)) {
+  if (!/^0\.8\.0\s*$/.test(version.stdout)) {
     throw new Error(`Unexpected bundle version output: ${version.stdout}`);
   }
 

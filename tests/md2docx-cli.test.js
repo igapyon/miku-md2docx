@@ -6,8 +6,13 @@ import { execFileSync } from "node:child_process";
 
 describe("miku-md2docx CLI", () => {
   it("prints version and help", () => {
-    expect(execFileSync("node", ["scripts/miku-md2docx-cli.mjs", "--version"], { encoding: "utf8" })).toMatch(/0\.5\.0/);
-    expect(execFileSync("node", ["scripts/miku-md2docx-cli.mjs", "--help"], { encoding: "utf8" })).toContain("Usage:");
+    expect(execFileSync("node", ["scripts/miku-md2docx-cli.mjs", "--version"], { encoding: "utf8" })).toMatch(/0\.8\.0/);
+    const help = execFileSync("node", ["scripts/miku-md2docx-cli.mjs", "--help"], { encoding: "utf8" });
+    expect(help).toContain("Usage:");
+    expect(help).toContain("Arguments:");
+    expect(help).toContain("Required options:");
+    expect(help).toContain("Local images are resolved relative to the input Markdown file.");
+    expect(help).toContain("exits with code 2");
   });
 
   it("converts a Markdown file to DOCX", () => {
