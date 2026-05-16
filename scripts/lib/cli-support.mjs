@@ -54,13 +54,30 @@ Usage:
   npm run cli -- --help
   npm run cli -- --version
 
+Arguments:
+  <input.md>            Markdown input file. Required for conversion.
+
+Required options:
+  --out <file>          DOCX output file. Required for conversion.
+
 Options:
-  --out <file>          Write DOCX output to file
   --summary             Print conversion summary to stdout
   --summary-out <file>  Write conversion summary to file
   --verbose             Print progress diagnostics to stderr
   --help                Show this help
   --version             Show version
+
+Examples:
+  npm run cli -- README.md --out README.docx
+  npm run cli -- README.md --out README.docx --summary
+  npm run cli -- README.md --out README.docx --summary-out README.summary.txt
+
+Notes:
+  Local images are resolved relative to the input Markdown file.
+  Remote image URLs are not downloaded.
+  Missing images and unresolved internal links are reported in the summary
+  without aborting conversion.
+  If <input.md> or --out is missing, the command exits with code 2.
 `;
 }
 
