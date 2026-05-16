@@ -356,27 +356,14 @@ bundle/miku-md2docx-sources.tgz
 
 GitHub Release asset upload is handled by `.github/workflows/release-assets.yml` on `v*` tag pushes.
 
-## 17. Browser UI
+## 17. Web App Surface
 
-The browser UI should follow the same local-first direction as the sibling project.
+The browser UI is owned by the separated `miku-md2docx-web` repository.
 
-First-cut browser behavior:
-
-- select or drop a Markdown file
-- provide local image assets when needed
-- generate `.docx` locally
-- show summary
-- download `.docx`
-- optionally download summary
-
-No selected local file should be uploaded to a remote service by default.
-
-The current browser entrypoints are:
-
-- `index.html`
-- `miku-md2docx.html`
-
-The browser runtime bundle is generated from `src/ts/main.ts` to `src/js/main.js`.
+This main application repository owns the product core, CLI, summary and
+diagnostics vocabulary, and CLI runtime bundle. The Web App repository should
+call or vendor the upstream runtime contract without redefining Markdown to
+DOCX conversion semantics.
 
 ## 18. Summary and Diagnostics
 
@@ -447,5 +434,5 @@ Recommended implementation order:
 9. image embedding and sizing
 10. missing image fallback and summary
 11. code blocks, blockquotes, horizontal rules, and task-list normalization
-12. browser UI
-13. CLI help, version, summary, and verbose output
+12. CLI help, version, summary, and verbose output
+13. separated Web App surface in `miku-md2docx-web`

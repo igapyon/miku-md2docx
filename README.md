@@ -29,22 +29,15 @@ Known limitations:
 - table alignment and merged cells are ignored
 - template `.docx` input is not supported
 
-## Browser Use
+## Web App
 
-Build the browser files:
+The browser UI is maintained in the separated Web App repository:
 
-```bash
-npm install
-npm run build
-```
+- <https://github.com/igapyon/miku-md2docx-web>
 
-Then open one of these files in a browser:
-
-- `index.html`
-- `miku-md2docx.html`
-
-The browser UI lets you choose a Markdown file, add local image files when
-needed, generate a `.docx`, review the summary, and download the result.
+This repository owns the Markdown to DOCX product core, CLI, and CLI release
+bundle. The Web App repository owns browser UI files, Single-file Web App
+generation, browser tests, and Web release assets.
 
 ## CLI Use
 
