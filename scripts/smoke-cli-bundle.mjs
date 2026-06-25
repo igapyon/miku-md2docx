@@ -14,8 +14,10 @@ async function runBundle(args) {
 }
 
 async function main() {
+  const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
+  const expectedVersion = String(packageJson.version);
   const version = await runBundle(["--version"]);
-  if (!/^0\.8\.0\s*$/.test(version.stdout)) {
+  if (version.stdout.trim() !== expectedVersion) {
     throw new Error(`Unexpected bundle version output: ${version.stdout}`);
   }
 
