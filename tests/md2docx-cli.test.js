@@ -3,10 +3,11 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import packageJson from "../package.json" with { type: "json" };
 
 describe("miku-md2docx CLI", () => {
   it("prints version and help", () => {
-    expect(execFileSync("node", ["scripts/miku-md2docx-cli.mjs", "--version"], { encoding: "utf8" })).toMatch(/0\.9\.0/);
+    expect(execFileSync("node", ["scripts/miku-md2docx-cli.mjs", "--version"], { encoding: "utf8" }).trim()).toBe(packageJson.version);
     const help = execFileSync("node", ["scripts/miku-md2docx-cli.mjs", "--help"], { encoding: "utf8" });
     expect(help).toContain("Usage:");
     expect(help).toContain("Arguments:");
