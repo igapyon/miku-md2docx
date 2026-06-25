@@ -1,4 +1,4 @@
-import type { ZipFileEntry } from "./zip-io.ts";
+import type { ZipEntryInput } from "../vendor/miku-ms-office-core-0.5.1.mjs";
 
 export interface ImageAsset {
   path: string;
@@ -49,7 +49,7 @@ export interface RenderContext {
   relationships: Relationship[];
   headingBookmarks: WeakMap<object, string>;
   knownBookmarks: Set<string>;
-  imageMedia: ZipFileEntry[];
+  imageMedia: ZipEntryInput[];
   nextRelId: number;
   nextDocPrId: number;
   options: Md2DocxOptions;

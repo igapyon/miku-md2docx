@@ -11,10 +11,10 @@ describe("convertMarkdownToDocx", () => {
       "_rels/.rels",
       "docProps/app.xml",
       "docProps/core.xml",
-      "word/document.xml",
       "word/_rels/document.xml.rels",
-      "word/styles.xml",
-      "word/numbering.xml"
+      "word/document.xml",
+      "word/numbering.xml",
+      "word/styles.xml"
     ]);
     expect(entries.get("word/document.xml")).toContain('<w:pStyle w:val="Heading1"/>');
     expect(entries.get("word/document.xml")).toContain('<w:t xml:space="preserve">Hello </w:t>');
