@@ -72,6 +72,18 @@ npm run smoke:bundle
 Release asset upload is handled by `.github/workflows/release-assets.yml` on
 `v*` tag pushes.
 
+## Vendored Runtime
+
+This repository vendors `miku-ms-office-core` as a local ESM runtime artifact
+under `src/vendor/`.
+
+Current vendored version:
+
+- `miku-ms-office-core` `v0.5.1`
+- runtime: `src/vendor/miku-ms-office-core-0.5.1.mjs`
+- source map: `src/vendor/miku-ms-office-core-0.5.1.mjs.map`
+- local TypeScript declarations: `src/vendor/miku-ms-office-core-0.5.1.d.mts`
+
 ## Web App
 
 The browser UI, Single-file Web App artifact, browser tests, and Web release

@@ -30,6 +30,7 @@ Remaining unchecked items are follow-up decisions, not blockers for the initial 
 - [x] Add raw HTML edge case tests for uppercase tags, single-quoted attributes, reordered attributes, and extra whitespace.
 - [x] Add manual DOCX compatibility smoke fixture and generator.
 - [x] Add explicit DOCX document relationships for `styles.xml` and `numbering.xml` so list numbering is loaded by Word-compatible readers.
+- [x] Refresh vendored `miku-ms-office-core` runtime to `v0.5.1`.
 
 ## Remaining Follow-up
 

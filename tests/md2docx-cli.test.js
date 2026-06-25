@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 
 describe("miku-md2docx CLI", () => {
   it("prints version and help", () => {
-    expect(execFileSync("node", ["scripts/miku-md2docx-cli.mjs", "--version"], { encoding: "utf8" })).toMatch(/0\.8\.0/);
+    expect(execFileSync("node", ["scripts/miku-md2docx-cli.mjs", "--version"], { encoding: "utf8" })).toMatch(/0\.9\.0/);
     const help = execFileSync("node", ["scripts/miku-md2docx-cli.mjs", "--help"], { encoding: "utf8" });
     expect(help).toContain("Usage:");
     expect(help).toContain("Arguments:");

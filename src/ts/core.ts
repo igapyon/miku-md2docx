@@ -1,4 +1,4 @@
-import { createZip } from "./zip-io.ts";
+import { writeZipPackage } from "../vendor/miku-ms-office-core-0.5.1.mjs";
 import { buildDocxEntries, buildDocumentXml } from "./docx-package.ts";
 import { collectHeadingBookmarks, parseMarkdown } from "./markdown-parser.ts";
 import { renderBlocks } from "./ooxml-renderer.ts";
@@ -26,5 +26,5 @@ export function convertMarkdownToDocx(markdown: string, options: Md2DocxOptions 
   const bodyBlocks = renderBlocks(tree.children ?? [], context);
   const documentXml = buildDocumentXml(bodyBlocks.join(""));
   const entries = buildDocxEntries(documentXml, context);
-  return { docx: createZip(entries), summary };
+  return { docx: writeZipPackage(entries), summary };
 }
