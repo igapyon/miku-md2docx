@@ -345,16 +345,20 @@ The release-oriented local bundle path is:
 ```bash
 npm run build:bundle
 npm run smoke:bundle
+npm run smoke:runtime
 ```
 
 Expected generated files:
 
 ```text
 bundle/miku-md2docx.mjs
+bundle/miku-md2docx-runtime.mjs
 bundle/miku-md2docx-sources.tgz
 ```
 
-GitHub Release asset upload is handled by `.github/workflows/release-assets.yml` on `v*` tag pushes.
+GitHub Release asset upload is handled by
+`.github/workflows/release-cli-runtime-bundles.yml` when a GitHub Release with
+a `v*` tag is published.
 
 ## 17. Web App Surface
 

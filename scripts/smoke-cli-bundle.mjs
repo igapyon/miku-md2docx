@@ -16,6 +16,11 @@ async function runBundle(args) {
 async function main() {
   const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
   const expectedVersion = String(packageJson.version);
+  const stat = await fs.stat(bundlePath);
+  if (stat.size < 100) {
+    throw new Error("CLI bundle file was unexpectedly small.");
+  }
+
   const version = await runBundle(["--version"]);
   if (version.stdout.trim() !== expectedVersion) {
     throw new Error(`Unexpected bundle version output: ${version.stdout}`);
@@ -34,8 +39,8 @@ async function main() {
   if (!conversion.stdout.includes("headings: 1")) {
     throw new Error("Bundle conversion smoke output did not include expected summary.");
   }
-  const stat = await fs.stat(outputPath);
-  if (stat.size < 100) {
+  const outputStat = await fs.stat(outputPath);
+  if (outputStat.size < 100) {
     throw new Error("Bundle conversion smoke output DOCX was unexpectedly small.");
   }
 }
