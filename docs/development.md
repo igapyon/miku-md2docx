@@ -5,6 +5,9 @@ for `miku-md2docx`.
 
 General user instructions are kept in [README.md](../README.md).
 
+The project-local entry point for shared miku-soft maintenance references is
+[miku-soft-reference.md](./miku-soft-reference.md).
+
 ## Current Development Status
 
 The initial first-cut development is complete.
@@ -62,15 +65,23 @@ It writes the roundtripped Markdown and summary under `workplace/roundtrip/`.
 
 ## Release Bundle
 
-Build and smoke-test the CLI release bundle:
+Build and smoke-test the CLI/runtime release bundles:
 
 ```bash
 npm run build:bundle
 npm run smoke:bundle
+npm run smoke:runtime
 ```
 
-Release asset upload is handled by `.github/workflows/release-assets.yml` on
-`v*` tag pushes.
+This generates:
+
+- `bundle/miku-md2docx.mjs`
+- `bundle/miku-md2docx-runtime.mjs`
+- `bundle/miku-md2docx-sources.tgz`
+
+Release asset upload is handled by
+`.github/workflows/release-cli-runtime-bundles.yml` when a GitHub Release with
+a `v*` tag is published.
 
 ## Vendored Runtime
 

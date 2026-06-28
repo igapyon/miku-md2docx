@@ -66,3 +66,6 @@ The initial first-cut development is complete. See [TODO.md](./TODO.md) for
 remaining follow-up decisions.
 
 Developer notes are in [docs/development.md](./docs/development.md).
+
+The project-local miku-soft reference entry point is
+[docs/miku-soft-reference.md](./docs/miku-soft-reference.md).

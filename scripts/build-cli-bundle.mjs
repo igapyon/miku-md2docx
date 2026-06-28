@@ -49,6 +49,7 @@ async function main() {
   await fs.mkdir(bundleDir, { recursive: true });
   const packageJson = JSON.parse(await fs.readFile(path.resolve(rootDir, "package.json"), "utf8"));
   const outputPath = path.resolve(bundleDir, `${productName}.mjs`);
+  const runtimePath = path.resolve(bundleDir, `${productName}-runtime.mjs`);
   const sourcesPath = path.resolve(bundleDir, `${productName}-sources.tgz`);
 
   await build({
@@ -73,10 +74,22 @@ async function main() {
     }
   });
   await fs.chmod(outputPath, 0o755);
+  await build({
+    entryPoints: ["src/ts/runtime.ts"],
+    bundle: true,
+    format: "esm",
+    platform: "node",
+    target: "node20",
+    outfile: runtimePath,
+    banner: {
+      js: `globalThis.__MIKU_MD2DOCX_VERSION = ${JSON.stringify(packageJson.version)};`
+    }
+  });
   await createSourceArchive(sourcesPath);
 
   console.log("[build:bundle] generated dist/core.js");
   console.log(`[build:bundle] generated ${path.relative(rootDir, outputPath)}`);
+  console.log(`[build:bundle] generated ${path.relative(rootDir, runtimePath)}`);
   console.log(`[build:bundle] generated ${path.relative(rootDir, sourcesPath)}`);
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "miku-md2docx",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
     "smoke:docx": "node scripts/smoke-docx-fixture.mjs",
     "smoke:roundtrip": "node scripts/smoke-roundtrip.mjs",
     "smoke:bundle": "node scripts/smoke-cli-bundle.mjs",
+    "smoke:runtime": "node scripts/smoke-runtime-bundle.mjs",
     "build": "node scripts/build-miku-md2docx.mjs",
     "build:bundle": "node scripts/build-cli-bundle.mjs",
     "build:all": "npm run build && npm run build:bundle"
