@@ -17,10 +17,12 @@ export function createSummary(): Md2DocxSummary {
     images: 0,
     embeddedImages: 0,
     missingImages: 0,
+    remoteImages: 0,
     resizedImages: 0,
     frontMatter: false,
     unsupportedHtml: 0,
-    missingImageDetails: []
+    missingImageDetails: [],
+    remoteImageDetails: []
   };
 }
 
@@ -41,6 +43,7 @@ export function formatSummary(summary: Md2DocxSummary): string {
     `images: ${summary.images}`,
     `embeddedImages: ${summary.embeddedImages}`,
     `missingImages: ${summary.missingImages}`,
+    `remoteImages: ${summary.remoteImages}`,
     `resizedImages: ${summary.resizedImages}`,
     `frontMatter: ${summary.frontMatter}`,
     `unsupportedHtml: ${summary.unsupportedHtml}`
@@ -49,6 +52,13 @@ export function formatSummary(summary: Md2DocxSummary): string {
     lines.push("missingImageDetails:");
     for (const detail of summary.missingImageDetails) {
       lines.push(`- path: ${detail.path}`);
+      lines.push(`  alt: ${detail.alt}`);
+    }
+  }
+  if (summary.remoteImageDetails.length > 0) {
+    lines.push("remoteImageDetails:");
+    for (const detail of summary.remoteImageDetails) {
+      lines.push(`- url: ${detail.url}`);
       lines.push(`  alt: ${detail.alt}`);
     }
   }

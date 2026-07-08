@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { writeZipPackage } from "../src/vendor/miku-ms-office-core-0.5.1.mjs";
 import { convertMarkdownToDocx, formatSummary } from "../src/ts/core.ts";
 import { expectXmlLines, normalizeXml, unzipStoredEntries, unzipTextEntries } from "./helpers/zip.js";
 
@@ -172,6 +173,48 @@ describe("convertMarkdownToDocx", () => {
     expect(result.summary.embeddedImages).toBe(1);
   });
 
+  it("uses a DOCX template package while replacing the document body", () => {
+    const baseEntries = unzipStoredEntries(convertMarkdownToDocx("Template body").docx);
+    const templateEntries = [...baseEntries].map(([path, data]) => ({ path, data }));
+    const templateDocumentXml = [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">',
+      '<w:body><w:p><w:r><w:t>Template body</w:t></w:r></w:p>',
+      '<w:sectPr><w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/></w:sectPr>',
+      "</w:body></w:document>"
+    ].join("");
+    const templateStylesXml = [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">',
+      '<w:style w:type="paragraph" w:styleId="TemplateOnly"><w:name w:val="Template Only"/></w:style>',
+      "</w:styles>"
+    ].join("");
+    const upsert = (entry) => {
+      const index = templateEntries.findIndex((item) => item.path === entry.path);
+      if (index >= 0) {
+        templateEntries[index] = entry;
+      } else {
+        templateEntries.push(entry);
+      }
+    };
+    upsert({ path: "word/document.xml", data: templateDocumentXml });
+    upsert({ path: "word/styles.xml", data: templateStylesXml });
+    upsert({ path: "customXml/item1.xml", data: "<template-marker/>" });
+
+    const result = convertMarkdownToDocx("# Generated\n\nText.", {
+      templateDocx: writeZipPackage(templateEntries)
+    });
+    const entries = unzipTextEntries(result.docx);
+
+    expect(entries.get("word/document.xml")).toContain("Generated");
+    expect(entries.get("word/document.xml")).not.toContain("Template body");
+    expect(entries.get("word/document.xml")).toContain('w:orient="landscape"');
+    expect(entries.get("word/styles.xml")).toContain('w:styleId="TemplateOnly"');
+    expect(entries.get("word/styles.xml")).toContain('w:styleId="Heading1"');
+    expect(entries.get("word/styles.xml")).toContain('w:styleId="CodeChar"');
+    expect(entries.get("customXml/item1.xml")).toBe("<template-marker/>");
+  });
+
   it("does not download remote image URLs and records them as missing images", () => {
     const result = convertMarkdownToDocx("![Remote](https://example.com/image.png)");
     const entries = unzipTextEntries(result.docx);
@@ -179,9 +222,13 @@ describe("convertMarkdownToDocx", () => {
     expect(entries.get("word/document.xml")).toContain("[Missing image: Remote]");
     expect(result.summary.images).toBe(1);
     expect(result.summary.missingImages).toBe(1);
-    expect(result.summary.missingImageDetails).toEqual([
-      { path: "https://example.com/image.png", alt: "Remote" }
+    expect(result.summary.remoteImages).toBe(1);
+    expect(result.summary.missingImageDetails).toEqual([]);
+    expect(result.summary.remoteImageDetails).toEqual([
+      { url: "https://example.com/image.png", alt: "Remote" }
     ]);
+    expect(formatSummary(result.summary)).toContain("remoteImages: 1");
+    expect(formatSummary(result.summary)).toContain("remoteImageDetails:");
   });
 
   it("shrinks large embedded images to document body width while preserving aspect ratio", () => {

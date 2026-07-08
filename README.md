@@ -27,7 +27,8 @@ Known limitations:
 - remote image URLs are not downloaded
 - SVG images are not converted
 - table alignment and merged cells are ignored
-- template `.docx` input is not supported
+- template `.docx` input is structural and best-effort; existing template body
+  content is not copied
 
 ## Web App
 
@@ -53,12 +54,32 @@ Convert a Markdown file:
 npm run cli -- ./sample.md --out ./sample.docx
 ```
 
+Direct Node.js execution is also supported:
+
+```bash
+node scripts/miku-md2docx-cli.mjs ./sample.md --out ./sample.docx
+```
+
+Use a Word template:
+
+```bash
+npm run cli -- ./sample.md --out ./sample.docx --template ./template.docx
+```
+
+Template mode replaces the template document body with generated Markdown
+content while preserving compatible package parts, styles, theme assets, and
+section settings where practical. It is structural rather than pixel-perfect.
+
 Show help or version:
 
 ```bash
 npm run cli -- --help
 npm run cli -- --version
 ```
+
+The generated `.docx` is written to `--out`. Existing `--out` files are
+overwritten. Summary output is written only when `--summary` or
+`--summary-out <file>` is specified.
 
 ## Current Status
 

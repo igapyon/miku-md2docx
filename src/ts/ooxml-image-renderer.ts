@@ -7,6 +7,14 @@ export function renderImage(node: any, context: RenderContext): RenderedInline {
   const url = String(node.url ?? "");
   const alt = String(node.alt ?? "");
   context.summary.images += 1;
+  if (isRemoteImageUrl(url)) {
+    context.summary.missingImages += 1;
+    context.summary.remoteImages += 1;
+    context.summary.remoteImageDetails.push({ url, alt });
+    const fallback = `[Missing image: ${alt || url}]`;
+    return { xml: runXml(fallback), text: fallback };
+  }
+
   const asset = context.options.imageLoader?.(url);
   if (!asset) {
     context.summary.missingImages += 1;
@@ -27,4 +35,8 @@ export function renderImage(node: any, context: RenderContext): RenderedInline {
     xml: drawingXml(relId, alt, displaySize.width, displaySize.height, context.nextDocPrId++),
     text: alt
   };
+}
+
+function isRemoteImageUrl(url: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(url);
 }
