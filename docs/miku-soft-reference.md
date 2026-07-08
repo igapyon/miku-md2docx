@@ -10,7 +10,7 @@ Shared reference location:
 Local reference used for this maintenance pass:
 
 - installed skill: `igapyon-miku-soft-developer`
-- checked date: 2026-06-29
+- checked date: 2026-07-08
 - workflow: existing project maintenance mode
 - owning layer: TypeScript / Node.js main application
 - skill commit: unavailable in the local installed skill directory

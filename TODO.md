@@ -31,19 +31,19 @@ Remaining unchecked items are follow-up decisions, not blockers for the initial 
 - [x] Add manual DOCX compatibility smoke fixture and generator.
 - [x] Add explicit DOCX document relationships for `styles.xml` and `numbering.xml` so list numbering is loaded by Word-compatible readers.
 - [x] Refresh vendored `miku-ms-office-core` runtime to `v0.5.1`.
+- [x] Add structural `--template <docx>` support that reuses compatible template package parts while replacing the document body.
 
 ## Remaining Follow-up
 
 - [x] Manually open generated `.docx` smoke file in Microsoft Word and LibreOffice.
 - [ ] Keep unordered and task lists as real DOCX list semantics; do not replace them with literal bullet characters as a compatibility workaround.
-- [ ] Decide whether remote image URLs should be reported with a dedicated summary field.
+- [x] Report remote image URLs with dedicated `remoteImages` and `remoteImageDetails` summary fields while keeping them counted as missing images.
 - [ ] Decide whether OOXML golden checks should stay inline or move to fixture files as coverage grows.
 - [x] Add an optional structural roundtrip smoke with `miku-md2docx` and `miku-docx2md` (`md2docx -> docx2md -> normalized Markdown/structure`), without requiring exact Markdown text equality.
 - [ ] Update `miku-md2docx-web` runtime refresh policy to consume a release runtime asset or current main-application runtime path instead of the historical `src/js/core.js` path.
 
 ## Future
 
-- Add optional template `.docx` support.
 - Consider `--strict` for treating missing images and unresolved internal links as hard failures.
 - Consider remote image handling only with explicit user action.
 - Far future: map front matter fields such as `title`, `author`, and `subject` into DOCX document properties.

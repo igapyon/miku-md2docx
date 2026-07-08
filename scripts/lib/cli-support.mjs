@@ -24,13 +24,15 @@ export function main(argv) {
 }
 
 export function parseArgs(argv) {
-  const args = { input: undefined, out: undefined, summary: false, summaryOut: undefined, verbose: false };
+  const args = { input: undefined, out: undefined, template: undefined, summary: false, summaryOut: undefined, verbose: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--help") return { help: true };
     if (arg === "--version") return { version: true };
     if (arg === "--out") {
       args.out = argv[++i];
+    } else if (arg === "--template") {
+      args.template = argv[++i];
     } else if (arg === "--summary") {
       args.summary = true;
     } else if (arg === "--summary-out") {
@@ -51,6 +53,7 @@ export function helpText() {
 
 Usage:
   npm run cli -- <input.md> --out <output.docx>
+  node scripts/miku-md2docx-cli.mjs <input.md> --out <output.docx>
   npm run cli -- --help
   npm run cli -- --version
 
@@ -63,21 +66,49 @@ Required options:
 Options:
   --summary             Print conversion summary to stdout
   --summary-out <file>  Write conversion summary to file
+  --template <docx>     Reuse compatible DOCX template package parts
   --verbose             Print progress diagnostics to stderr
   --help                Show this help
   --version             Show version
 
+Inputs:
+  <input.md> is read as UTF-8 Markdown. Local images are resolved relative to
+  the input Markdown file.
+
+Outputs:
+  --out <file> is the generated editable Word .docx file. Summary output is
+  written only when --summary or --summary-out is specified.
+
+Overwrite behavior:
+  Existing --out and --summary-out files are overwritten.
+
+Diagnostics:
+  CLI usage errors and unexpected runtime errors are written to stderr.
+  Missing images, remote image URLs, unresolved internal links, and unsupported
+  HTML are reported in the summary without aborting conversion.
+
+Exit codes:
+  0  success, --help, or --version
+  1  conversion or file-system failure
+  2  invalid CLI usage, such as missing <input.md> or --out
+
 Examples:
   npm run cli -- README.md --out README.docx
+  npm run cli -- README.md --out README.docx --template template.docx
   npm run cli -- README.md --out README.docx --summary
   npm run cli -- README.md --out README.docx --summary-out README.summary.txt
 
-Notes:
-  Local images are resolved relative to the input Markdown file.
+Template notes:
+  Template mode replaces the template document body with generated Markdown
+  content while preserving compatible package parts where practical.
+  Template styles and section settings may carry over; numbering is regenerated.
+  Existing template body paragraphs are not copied.
+  Header and footer references are not carried over in the first cut.
+
+Markdown handling notes:
   Remote image URLs are not downloaded.
-  Missing images and unresolved internal links are reported in the summary
-  without aborting conversion.
-  If <input.md> or --out is missing, the command exits with code 2.
+  SVG images are not converted.
+  Table alignment and merged cells are ignored.
 `;
 }
 
@@ -88,6 +119,7 @@ function convertFile(args) {
   const markdown = readFileSync(inputPath, "utf8");
   const result = convertMarkdownToDocx(markdown, {
     inputPath,
+    templateDocx: args.template === undefined ? undefined : readFileSync(resolve(args.template)),
     imageLoader: (imagePath) => loadImage(inputPath, imagePath)
   });
   writeFileSync(outputPath, result.docx);
