@@ -6,10 +6,12 @@ export const REL_HYPERLINK = "http://schemas.openxmlformats.org/officeDocument/2
 export const REL_IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 export const REL_STYLES = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
 export const REL_NUMBERING = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
+export const REL_SETTINGS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings";
 
 const REQUIRED_DOCUMENT_RELATIONSHIPS: OpcRelationship[] = [
   { id: "rIdStyles", type: REL_STYLES, target: "styles.xml" },
-  { id: "rIdNumbering", type: REL_NUMBERING, target: "numbering.xml" }
+  { id: "rIdNumbering", type: REL_NUMBERING, target: "numbering.xml" },
+  { id: "rIdSettings", type: REL_SETTINGS, target: "settings.xml" }
 ];
 
 export function addRelationship(context: RenderContext, type: string, target: string, targetMode?: string): string {

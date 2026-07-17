@@ -304,11 +304,16 @@ word/document.xml
 word/_rels/document.xml.rels
 word/styles.xml
 word/numbering.xml
+word/settings.xml
 docProps/core.xml
 docProps/app.xml
 ```
 
-`word/_rels/document.xml.rels` must include explicit relationships from the main document to `styles.xml` and `numbering.xml`. Numbering definitions are not just loose package parts; list paragraphs depend on the numbering relationship being discoverable by Word-compatible readers.
+`word/_rels/document.xml.rels` must include explicit relationships from the main document to `styles.xml`, `numbering.xml`, and `settings.xml`. Numbering definitions are not just loose package parts; list paragraphs depend on the numbering relationship being discoverable by Word-compatible readers.
+
+`word/settings.xml` must set `w:compatSetting` named `compatibilityMode` to
+`15`. This prevents the generated document from defaulting to the Word 2007
+compatibility feature set when opened in current Microsoft Word versions.
 
 When images are embedded, include:
 

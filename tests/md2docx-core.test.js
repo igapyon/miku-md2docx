@@ -15,11 +15,15 @@ describe("convertMarkdownToDocx", () => {
       "word/_rels/document.xml.rels",
       "word/document.xml",
       "word/numbering.xml",
+      "word/settings.xml",
       "word/styles.xml"
     ]);
     expect(entries.get("word/document.xml")).toContain('<w:pStyle w:val="Heading1"/>');
     expect(entries.get("word/document.xml")).toContain('<w:t xml:space="preserve">Hello </w:t>');
     expect(entries.get("word/document.xml")).toContain("<w:b/>");
+    expect(entries.get("word/settings.xml")).toContain('<w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>');
+    expect(entries.get("word/_rels/document.xml.rels")).toContain('Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"');
+    expect(entries.get("[Content_Types].xml")).toContain('PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"');
     expect(result.summary.headings).toBe(1);
     expect(result.summary.paragraphs).toBe(1);
   });
@@ -64,6 +68,7 @@ describe("convertMarkdownToDocx", () => {
     expectXmlLines(relsXml, [
       '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>',
       '<Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>',
+      '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>',
       '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/path?a=1&amp;b=2" TargetMode="External"/>'
     ]);
     expectXmlLines(stylesXml, [
@@ -199,6 +204,10 @@ describe("convertMarkdownToDocx", () => {
     };
     upsert({ path: "word/document.xml", data: templateDocumentXml });
     upsert({ path: "word/styles.xml", data: templateStylesXml });
+    upsert({
+      path: "word/settings.xml",
+      data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:zoom w:percent="90"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="12"/></w:compat></w:settings>'
+    });
     upsert({ path: "customXml/item1.xml", data: "<template-marker/>" });
 
     const result = convertMarkdownToDocx("# Generated\n\nText.", {
@@ -212,6 +221,9 @@ describe("convertMarkdownToDocx", () => {
     expect(entries.get("word/styles.xml")).toContain('w:styleId="TemplateOnly"');
     expect(entries.get("word/styles.xml")).toContain('w:styleId="Heading1"');
     expect(entries.get("word/styles.xml")).toContain('w:styleId="CodeChar"');
+    expect(entries.get("word/settings.xml")).toContain('<w:zoom w:percent="90"/>');
+    expect(entries.get("word/settings.xml")).toContain('w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"');
+    expect(entries.get("word/settings.xml")).not.toContain('w:val="12"');
     expect(entries.get("customXml/item1.xml")).toBe("<template-marker/>");
   });
 

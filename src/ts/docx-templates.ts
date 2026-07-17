@@ -72,6 +72,30 @@ export function numberingXml(): string {
   ].join("");
 }
 
+export function settingsXml(templateXml?: string): string {
+  const compatibilitySetting = '<w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>';
+  if (templateXml === undefined) {
+    return [
+      XML_DECLARATION,
+      '<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">',
+      `<w:compat>${compatibilitySetting}</w:compat>`,
+      "</w:settings>"
+    ].join("");
+  }
+
+  const existingCompatibilityMode = /<w:compatSetting\b(?=[^>]*\bw:name=(?:"compatibilityMode"|'compatibilityMode'))[^>]*(?:\/>|>\s*<\/w:compatSetting>)/;
+  if (existingCompatibilityMode.test(templateXml)) {
+    return templateXml.replace(existingCompatibilityMode, compatibilitySetting);
+  }
+  if (/<w:compat\s*\/>/.test(templateXml)) {
+    return templateXml.replace(/<w:compat\s*\/>/, `<w:compat>${compatibilitySetting}</w:compat>`);
+  }
+  if (/<w:compat\b[^>]*>/.test(templateXml)) {
+    return templateXml.replace("</w:compat>", `${compatibilitySetting}</w:compat>`);
+  }
+  return templateXml.replace("</w:settings>", `<w:compat>${compatibilitySetting}</w:compat></w:settings>`);
+}
+
 export function corePropsXml(): string {
   return [
     XML_DECLARATION,
