@@ -1,0 +1,35 @@
+{
+  "name": "miku-md2docx",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npm run build --silent && vitest run",
+    "test:unit": "npm run build --silent && vitest run",
+    "test:watch": "vitest",
+    "cli": "npm run build --silent && node scripts/miku-md2docx-cli.mjs",
+    "smoke:version": "npm run build --silent && node scripts/miku-md2docx-cli.mjs --version",
+    "smoke:docx": "node scripts/smoke-docx-fixture.mjs",
+    "smoke:roundtrip": "node scripts/smoke-roundtrip.mjs",
+    "smoke:bundle": "node scripts/smoke-cli-bundle.mjs",
+    "smoke:runtime": "node scripts/smoke-runtime-bundle.mjs",
+    "build": "node scripts/build-miku-md2docx.mjs",
+    "build:bundle": "node scripts/build-cli-bundle.mjs",
+    "build:all": "npm run build && npm run build:bundle"
+  },
+  "dependencies": {
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
+  }
+}
