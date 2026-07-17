@@ -9,7 +9,7 @@ import type { LoadedDocxTemplatePackage } from "./docx-template-loader.ts";
 import type { RenderContext } from "./types.ts";
 import { contentTypeForExt } from "./image-assets.ts";
 import { documentRelsXml } from "./relationships.ts";
-import { appPropsXml, corePropsXml, numberingXml, packageRelsXml, stylesXml } from "./docx-templates.ts";
+import { appPropsXml, corePropsXml, numberingXml, packageRelsXml, settingsXml, stylesXml } from "./docx-templates.ts";
 
 export function buildDocxEntries(documentXml: string, context: RenderContext): ZipEntryInput[] {
   if (context.templatePackage !== undefined) {
@@ -25,6 +25,7 @@ export function buildDocxEntries(documentXml: string, context: RenderContext): Z
     { path: "word/_rels/document.xml.rels", data: documentRelsXml(context.relationships) },
     { path: "word/styles.xml", data: stylesXml() },
     { path: "word/numbering.xml", data: numberingXml() },
+    { path: "word/settings.xml", data: settingsXml() },
     ...context.imageMedia
   ];
 }
@@ -50,6 +51,10 @@ function buildTemplatedDocxEntries(
   entries = upsertEntry(entries, { path: "word/_rels/document.xml.rels", data: documentRelsXml(context.relationships) });
   entries = upsertEntry(entries, { path: "word/styles.xml", data: templateStylesXml(templatePackage) });
   entries = upsertEntry(entries, { path: "word/numbering.xml", data: numberingXml() });
+  entries = upsertEntry(entries, {
+    path: "word/settings.xml",
+    data: settingsXml(getZipTextEntry(templatePackage.entries, "word/settings.xml"))
+  });
   for (const image of context.imageMedia) {
     entries = upsertEntry(entries, image);
   }
@@ -115,6 +120,10 @@ function contentTypesXml(images: ZipEntryInput[], templateEntries?: ZipEntry[]):
         partName: "word/numbering.xml",
         contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"
       },
+      {
+        partName: "word/settings.xml",
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"
+      },
       { partName: "docProps/core.xml", contentType: "application/vnd.openxmlformats-package.core-properties+xml" },
       { partName: "docProps/app.xml", contentType: "application/vnd.openxmlformats-officedocument.extended-properties+xml" }
     ]
@@ -141,6 +150,7 @@ function mergeContentTypesXml(images: ZipEntryInput[], templateEntries: ZipEntry
   overrides.set("word/document.xml", "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml");
   overrides.set("word/styles.xml", "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml");
   overrides.set("word/numbering.xml", "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml");
+  overrides.set("word/settings.xml", "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml");
   overrides.set("docProps/core.xml", "application/vnd.openxmlformats-package.core-properties+xml");
   overrides.set("docProps/app.xml", "application/vnd.openxmlformats-officedocument.extended-properties+xml");
 
