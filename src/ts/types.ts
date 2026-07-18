@@ -1,4 +1,4 @@
-import type { ZipEntryInput } from "../vendor/miku-ms-office-core-0.5.1.mjs";
+import type { ZipEntryInput } from "../vendor/miku-ms-office-core-0.6.0.mjs";
 import type { LoadedDocxTemplatePackage } from "./docx-template-loader.ts";
 
 export interface ImageAsset {

@@ -4,7 +4,7 @@ import {
   parseOpcContentTypesXml,
   type ZipEntry,
   type ZipEntryInput
-} from "../vendor/miku-ms-office-core-0.5.1.mjs";
+} from "../vendor/miku-ms-office-core-0.6.0.mjs";
 import type { LoadedDocxTemplatePackage } from "./docx-template-loader.ts";
 import type { RenderContext } from "./types.ts";
 import { contentTypeForExt } from "./image-assets.ts";

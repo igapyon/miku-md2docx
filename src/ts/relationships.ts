@@ -1,5 +1,5 @@
 import type { RenderContext, Relationship } from "./types.ts";
-import { buildOpcRelationshipsXml, type OpcRelationship } from "../vendor/miku-ms-office-core-0.5.1.mjs";
+import { buildOpcRelationshipsXml, type OpcRelationship } from "../vendor/miku-ms-office-core-0.6.0.mjs";
 
 export const REL_OFFICE_DOCUMENT = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
 export const REL_HYPERLINK = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
