@@ -90,10 +90,10 @@ under `src/vendor/`.
 
 Current vendored version:
 
-- `miku-ms-office-core` `v0.5.1`
-- runtime: `src/vendor/miku-ms-office-core-0.5.1.mjs`
-- source map: `src/vendor/miku-ms-office-core-0.5.1.mjs.map`
-- local TypeScript declarations: `src/vendor/miku-ms-office-core-0.5.1.d.mts`
+- `miku-ms-office-core` `v0.6.0`
+- runtime: `src/vendor/miku-ms-office-core-0.6.0.mjs`
+- source map: `src/vendor/miku-ms-office-core-0.6.0.mjs.map`
+- local TypeScript declarations: `src/vendor/miku-ms-office-core-0.6.0.d.mts`
 
 ## Web App
 

@@ -31,6 +31,7 @@ Remaining unchecked items are follow-up decisions, not blockers for the initial 
 - [x] Add manual DOCX compatibility smoke fixture and generator.
 - [x] Add explicit DOCX document relationships for `styles.xml` and `numbering.xml` so list numbering is loaded by Word-compatible readers.
 - [x] Refresh vendored `miku-ms-office-core` runtime to `v0.5.1`.
+- [x] Refresh vendored `miku-ms-office-core` runtime to `v0.6.0`.
 - [x] Add structural `--template <docx>` support that reuses compatible template package parts while replacing the document body.
 - [x] Add `word/settings.xml` with `compatibilityMode=15` and its OOXML package declarations so current Microsoft Word does not default generated documents to Word 2007 compatibility mode.
 

@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { writeZipPackage } from "../src/vendor/miku-ms-office-core-0.5.1.mjs";
+import { sanitizeXmlText, writeZipPackage } from "../src/vendor/miku-ms-office-core-0.6.0.mjs";
 import { convertMarkdownToDocx, formatSummary } from "../src/ts/core.ts";
 import { expectXmlLines, normalizeXml, unzipStoredEntries, unzipTextEntries } from "./helpers/zip.js";
 
 describe("convertMarkdownToDocx", () => {
+  it("preserves supplementary Unicode through the vendored XML sanitizer", () => {
+    expect(sanitizeXmlText("😀 🐇 𠮷野家")).toBe("😀 🐇 𠮷野家");
+    expect(sanitizeXmlText("before\uD800after\uFFFE")).toBe("beforeafter");
+  });
+
   it("creates a DOCX zip containing core OOXML entries", () => {
     const result = convertMarkdownToDocx("# Title\n\nHello **world**.");
     const entries = unzipTextEntries(result.docx);

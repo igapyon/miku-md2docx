@@ -1,4 +1,4 @@
-import { writeZipPackage } from "../vendor/miku-ms-office-core-0.5.1.mjs";
+import { writeZipPackage } from "../vendor/miku-ms-office-core-0.6.0.mjs";
 import { buildDocxEntries, buildDocumentXml } from "./docx-package.ts";
 import { collectHeadingBookmarks, parseMarkdown } from "./markdown-parser.ts";
 import { loadDocxTemplatePackage } from "./docx-template-loader.ts";

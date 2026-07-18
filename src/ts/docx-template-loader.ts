@@ -1,4 +1,4 @@
-import { readZipPackage, type ZipEntry } from "../vendor/miku-ms-office-core-0.5.1.mjs";
+import { readZipPackage, type ZipEntry } from "../vendor/miku-ms-office-core-0.6.0.mjs";
 
 export interface LoadedDocxTemplatePackage {
   entries: ZipEntry[];
