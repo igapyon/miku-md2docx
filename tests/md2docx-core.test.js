@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sanitizeXmlText, writeZipPackage } from "../src/vendor/miku-ms-office-core-0.6.0.mjs";
 import { convertMarkdownToDocx, formatSummary } from "../src/ts/core.ts";
-import { expectXmlLines, normalizeXml, unzipStoredEntries, unzipTextEntries } from "./helpers/zip.js";
+import { expectXmlLines, normalizeXml, unzipStoredEntries, unzipTextEntries, zipCompressionMethods } from "./helpers/zip.js";
 
 describe("convertMarkdownToDocx", () => {
   it("preserves supplementary Unicode through the vendored XML sanitizer", () => {
@@ -12,6 +12,7 @@ describe("convertMarkdownToDocx", () => {
   it("creates a DOCX zip containing core OOXML entries", () => {
     const result = convertMarkdownToDocx("# Title\n\nHello **world**.");
     const entries = unzipTextEntries(result.docx);
+    expect(new Set(zipCompressionMethods(result.docx))).toEqual(new Set([8]));
     expect([...entries.keys()]).toEqual([
       "[Content_Types].xml",
       "_rels/.rels",
@@ -220,6 +221,7 @@ describe("convertMarkdownToDocx", () => {
     });
     const entries = unzipTextEntries(result.docx);
 
+    expect(new Set(zipCompressionMethods(result.docx))).toEqual(new Set([8]));
     expect(entries.get("word/document.xml")).toContain("Generated");
     expect(entries.get("word/document.xml")).not.toContain("Template body");
     expect(entries.get("word/document.xml")).toContain('w:orient="landscape"');

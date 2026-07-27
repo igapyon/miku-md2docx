@@ -15,7 +15,7 @@ async function runBundle(args) {
 
 async function main() {
   const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
-  const expectedVersion = String(packageJson.version);
+  const expectedVersion = String(process.env.RELEASE_VERSION ?? packageJson.version);
   const stat = await fs.stat(bundlePath);
   if (stat.size < 100) {
     throw new Error("CLI bundle file was unexpectedly small.");
@@ -27,8 +27,11 @@ async function main() {
   }
 
   const help = await runBundle(["--help"]);
-  if (!help.stdout.includes("Usage:") || !help.stdout.includes("miku-md2docx")) {
-    throw new Error("Bundle help output did not include the expected usage text.");
+  if (
+    !help.stdout.includes("Usage:")
+    || !help.stdout.includes(`node miku-md2docx-${expectedVersion}.mjs`)
+  ) {
+    throw new Error("Bundle help output did not include the expected versioned Release Asset command.");
   }
 
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "miku-md2docx-bundle-"));

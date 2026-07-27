@@ -31,5 +31,8 @@ export function convertMarkdownToDocx(markdown: string, options: Md2DocxOptions 
   const bodyBlocks = renderBlocks(tree.children ?? [], context);
   const documentXml = buildDocumentXml(bodyBlocks.join(""), context);
   const entries = buildDocxEntries(documentXml, context);
-  return { docx: writeZipPackage(entries), summary };
+  return {
+    docx: writeZipPackage(entries.map((entry) => ({ ...entry, compression: "deflate" as const }))),
+    summary
+  };
 }

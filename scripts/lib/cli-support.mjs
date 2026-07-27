@@ -1,8 +1,14 @@
 import { dirname, resolve } from "node:path";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { convertMarkdownToDocx, formatSummary } from "../../dist/core.js";
 
 const packageVersion = readPackageVersion();
+
+class CliUsageError extends Error {}
+
+export function isCliUsageError(error) {
+  return error instanceof CliUsageError;
+}
 
 export function main(argv) {
   const args = parseArgs(argv);
@@ -30,19 +36,21 @@ export function parseArgs(argv) {
     if (arg === "--help") return { help: true };
     if (arg === "--version") return { version: true };
     if (arg === "--out") {
-      args.out = argv[++i];
+      args.out = readOptionValue(argv, ++i, arg);
     } else if (arg === "--template") {
-      args.template = argv[++i];
+      args.template = readOptionValue(argv, ++i, arg);
     } else if (arg === "--summary") {
       args.summary = true;
     } else if (arg === "--summary-out") {
-      args.summaryOut = argv[++i];
+      args.summaryOut = readOptionValue(argv, ++i, arg);
     } else if (arg === "--verbose") {
       args.verbose = true;
+    } else if (arg.startsWith("-")) {
+      throw new CliUsageError(`Unknown option: ${arg}`);
     } else if (!args.input) {
       args.input = arg;
     } else {
-      throw new Error(`Unknown argument: ${arg}`);
+      throw new CliUsageError(`Unexpected argument: ${arg}`);
     }
   }
   return args;
@@ -52,10 +60,17 @@ export function helpText() {
   return `miku-md2docx ${packageVersion}
 
 Usage:
-  npm run cli -- <input.md> --out <output.docx>
-  node scripts/miku-md2docx-cli.mjs <input.md> --out <output.docx>
-  npm run cli -- --help
-  npm run cli -- --version
+  node miku-md2docx-${packageVersion}.mjs <input.md> --out <output.docx>
+  node miku-md2docx-${packageVersion}.mjs --help
+  node miku-md2docx-${packageVersion}.mjs --version
+
+Description:
+  Convert one UTF-8 Markdown file to one editable Word .docx file locally.
+
+Primary contract:
+  stdout  Human-readable summary only with --summary; help and version text
+  stderr  CLI usage errors, file or conversion failures, and --verbose progress
+  file    The generated .docx; optional human-readable summary text file
 
 Arguments:
   <input.md>            Markdown input file. Required for conversion.
@@ -77,13 +92,24 @@ Inputs:
 
 Outputs:
   --out <file> is the generated editable Word .docx file. Summary output is
-  written only when --summary or --summary-out is specified.
+  written only when --summary or --summary-out is specified. Parent directories
+  for --out and --summary-out are created automatically.
 
 Overwrite behavior:
   Existing --out and --summary-out files are overwritten.
 
+Generated artifacts:
+  Conversion creates only the .docx given by --out and, when requested, the
+  summary text file given by --summary-out. Repository dist/ and bundle/
+  directories are development build artifacts, not conversion outputs.
+
+Machine-readable output contract:
+  The .docx file is the primary generated artifact. Summary output is
+  human-readable text and is not a stable machine-readable API.
+
 Diagnostics:
-  CLI usage errors and unexpected runtime errors are written to stderr.
+  CLI usage errors, file-system failures, conversion failures, and verbose
+  progress are written to stderr.
   Missing images, remote image URLs, unresolved internal links, and unsupported
   HTML are reported in the summary without aborting conversion.
 
@@ -93,10 +119,10 @@ Exit codes:
   2  invalid CLI usage, such as missing <input.md> or --out
 
 Examples:
-  npm run cli -- README.md --out README.docx
-  npm run cli -- README.md --out README.docx --template template.docx
-  npm run cli -- README.md --out README.docx --summary
-  npm run cli -- README.md --out README.docx --summary-out README.summary.txt
+  node miku-md2docx-${packageVersion}.mjs README.md --out README.docx
+  node miku-md2docx-${packageVersion}.mjs README.md --out README.docx --template template.docx
+  node miku-md2docx-${packageVersion}.mjs README.md --out README.docx --summary
+  node miku-md2docx-${packageVersion}.mjs README.md --out README.docx --summary-out reports/README.summary.txt
 
 Template notes:
   Template mode replaces the template document body with generated Markdown
@@ -112,6 +138,14 @@ Markdown handling notes:
 `;
 }
 
+function readOptionValue(argv, index, option) {
+  const value = argv[index];
+  if (value === undefined || value.startsWith("--")) {
+    throw new CliUsageError(`${option} requires a value.`);
+  }
+  return value;
+}
+
 function convertFile(args) {
   const inputPath = resolve(args.input);
   const outputPath = resolve(args.out);
@@ -122,6 +156,7 @@ function convertFile(args) {
     templateDocx: args.template === undefined ? undefined : readFileSync(resolve(args.template)),
     imageLoader: (imagePath) => loadImage(inputPath, imagePath)
   });
+  mkdirSync(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, result.docx);
   if (args.verbose) process.stderr.write(`verbose: wrote ${args.out}\n`);
   writeSummaryOutputs(args, result);
@@ -139,7 +174,11 @@ function loadImage(inputPath, imagePath) {
 function writeSummaryOutputs(args, result) {
   const summary = formatSummary(result.summary);
   if (args.summary) process.stdout.write(summary);
-  if (args.summaryOut) writeFileSync(resolve(args.summaryOut), summary);
+  if (args.summaryOut) {
+    const summaryPath = resolve(args.summaryOut);
+    mkdirSync(dirname(summaryPath), { recursive: true });
+    writeFileSync(summaryPath, summary);
+  }
 }
 
 function readPackageVersion() {
