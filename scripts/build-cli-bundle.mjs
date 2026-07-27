@@ -48,6 +48,12 @@ async function createSourceArchive(outputPath) {
 async function main() {
   await fs.mkdir(bundleDir, { recursive: true });
   const packageJson = JSON.parse(await fs.readFile(path.resolve(rootDir, "package.json"), "utf8"));
+  const releaseVersion = process.env.RELEASE_VERSION ?? packageJson.version;
+  if (releaseVersion !== packageJson.version && !releaseVersion.startsWith(`${packageJson.version}.`)) {
+    throw new Error(
+      `RELEASE_VERSION (${releaseVersion}) must match package.json version (${packageJson.version}) or add a dot suffix.`
+    );
+  }
   const outputPath = path.resolve(bundleDir, `${productName}.mjs`);
   const runtimePath = path.resolve(bundleDir, `${productName}-runtime.mjs`);
   const sourcesPath = path.resolve(bundleDir, `${productName}-sources.tgz`);
@@ -70,7 +76,7 @@ async function main() {
     target: "node20",
     outfile: outputPath,
     banner: {
-      js: `globalThis.__MIKU_MD2DOCX_VERSION = ${JSON.stringify(packageJson.version)};`
+      js: `globalThis.__MIKU_MD2DOCX_VERSION = ${JSON.stringify(releaseVersion)};`
     }
   });
   await fs.chmod(outputPath, 0o755);
@@ -82,7 +88,7 @@ async function main() {
     target: "node20",
     outfile: runtimePath,
     banner: {
-      js: `globalThis.__MIKU_MD2DOCX_VERSION = ${JSON.stringify(packageJson.version)};`
+      js: `globalThis.__MIKU_MD2DOCX_VERSION = ${JSON.stringify(releaseVersion)};`
     }
   });
   await createSourceArchive(sourcesPath);

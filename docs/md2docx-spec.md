@@ -353,12 +353,19 @@ template package structures may need manual adjustment in Word.
 Minimum CLI behavior:
 
 ```bash
-npm run cli -- ./sample.md --out ./sample.docx
-node scripts/miku-md2docx-cli.mjs ./sample.md --out ./sample.docx
-npm run cli -- ./sample.md --out ./sample.docx --template ./template.docx
-npm run cli -- --help
-npm run cli -- --version
+node miku-md2docx-1.1.0.mjs ./sample.md --out ./sample.docx
+node miku-md2docx-1.1.0.mjs ./sample.md --out ./sample.docx --template ./template.docx
+node miku-md2docx-1.1.0.mjs --help
+node miku-md2docx-1.1.0.mjs --version
 ```
+
+These examples use the package version. For a Release tag with an additional
+dot suffix, the Release Asset name, `--help`, and `--version` use the complete
+Release version.
+
+Source-tree development may use `npm run cli -- ...` or
+`node scripts/miku-md2docx-cli.mjs ...`; these are development commands rather
+than the primary Release Asset contract.
 
 Additional first-cut options:
 
@@ -366,7 +373,6 @@ Additional first-cut options:
 --summary
 --summary-out <file>
 --template <docx>
---debug
 --verbose
 ```
 
@@ -386,16 +392,20 @@ Input behavior:
 Output behavior:
 
 - `--out <file>` is the generated editable Word `.docx` file.
+- missing parent directories for `--out` and `--summary-out` are created
+  automatically.
 - existing `--out` files are overwritten.
-- `--summary` writes the conversion summary to stdout.
+- `--summary` writes a human-readable conversion summary to stdout.
 - `--summary-out <file>` writes the conversion summary to the given file and
   overwrites it when it already exists.
+- summary text is not a stable machine-readable API.
 - normal conversion does not emit extra artifact files unless explicitly
   requested.
 
 Diagnostics behavior:
 
-- CLI usage errors and unexpected runtime errors are written to stderr.
+- CLI usage errors, file-system failures, conversion failures, and verbose
+  progress are written to stderr.
 - missing images, remote image URLs, unresolved internal links, and unsupported
   HTML are reported in the summary without aborting conversion.
 

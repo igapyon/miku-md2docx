@@ -6,6 +6,7 @@ It is a local tool. Your Markdown file and local images are processed on your
 machine and are not uploaded to a server.
 
 The conversion goal is document structure, not pixel-perfect Word layout.
+Generated DOCX package entries use ZIP DEFLATE compression.
 
 ## What It Converts
 
@@ -42,44 +43,53 @@ generation, browser tests, and Web release assets.
 
 ## CLI Use
 
-Install dependencies once:
+Download the versioned CLI asset from GitHub Releases, then run it directly:
 
 ```bash
-npm install
+node miku-md2docx-1.1.0.mjs ./sample.md --out ./sample.docx
 ```
 
-Convert a Markdown file:
+The examples use the package version `1.1.0`. If a Release uses an additional
+tag suffix, use the exact downloaded Asset name, such as
+`miku-md2docx-1.1.0.2.mjs`; its `--help` and `--version` output include the
+complete Release version.
 
-```bash
-npm run cli -- ./sample.md --out ./sample.docx
-```
-
-Direct Node.js execution is also supported:
-
-```bash
-node scripts/miku-md2docx-cli.mjs ./sample.md --out ./sample.docx
-```
+The CLI creates missing parent directories for `--out` and `--summary-out`.
+Existing output files are overwritten.
 
 Use a Word template:
 
 ```bash
+node miku-md2docx-1.1.0.mjs ./sample.md --out ./sample.docx --template ./template.docx
+```
+
+Show help or version:
+
+```bash
+node miku-md2docx-1.1.0.mjs --help
+node miku-md2docx-1.1.0.mjs --version
+```
+
+For source-tree development, install dependencies once and use:
+
+```bash
+npm install
+npm run cli -- ./sample.md --out ./sample.docx
 npm run cli -- ./sample.md --out ./sample.docx --template ./template.docx
+npm run cli -- --help
+npm run cli -- --version
 ```
 
 Template mode replaces the template document body with generated Markdown
 content while preserving compatible package parts, styles, theme assets, and
 section settings where practical. It is structural rather than pixel-perfect.
 
-Show help or version:
-
-```bash
-npm run cli -- --help
-npm run cli -- --version
-```
-
-The generated `.docx` is written to `--out`. Existing `--out` files are
-overwritten. Summary output is written only when `--summary` or
-`--summary-out <file>` is specified.
+The generated `.docx` is the primary artifact. `--summary` writes
+human-readable text to stdout, while `--summary-out <file>` writes the same
+human-readable summary to a file. The summary is not a stable machine-readable
+API. Usage errors, failures, and `--verbose` progress are written to stderr.
+Normal conversion creates no repository build artifacts such as `dist/` or
+`bundle/`.
 
 ## Current Status
 
